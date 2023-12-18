@@ -1,0 +1,201 @@
+absl-py @ file:///dev/shm/tensorboard/2.10.0/foss-2022a/abslpy/absl-py-1.2.0
+alabaster @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/alabaster/alabaster-0.7.12
+alembic==1.13.0
+appdirs @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/appdirs/appdirs-1.4.4
+asn1crypto @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/asn1crypto/asn1crypto-1.5.1
+atomicwrites @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/atomicwrites/atomicwrites-1.4.0
+attrs @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/attrs/attrs-21.4.0
+Babel @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/Babel/Babel-2.10.1
+backports.entry-points-selectable @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/backportsentry_points_selectable/backports.entry_points_selectable-1.1.1
+backports.functools-lru-cache @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/backportsfunctools_lru_cache/backports.functools_lru_cache-1.6.4
+bcrypt @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/bcrypt/bcrypt-3.2.2
+beniget @ file:///dev/shm/SciPybundle/2022.05/foss-2022a/beniget/beniget-0.4.1
+bitstring @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/bitstring/bitstring-3.1.9
+blist @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/blist/blist-1.3.6
+Bottleneck @ file:///dev/shm/SciPybundle/2022.05/foss-2022a/Bottleneck/Bottleneck-1.3.4
+CacheControl @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/CacheControl/CacheControl-0.12.11
+cachetools @ file:///dev/shm/tensorboard/2.10.0/foss-2022a/cachetools/cachetools-5.2.0
+cachy @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/cachy/cachy-0.3.0
+certifi @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/certifi/certifi-2021.10.8
+cffi @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/cffi/cffi-1.15.0
+chardet @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/chardet/chardet-4.0.0
+charset-normalizer @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/charsetnormalizer/charset-normalizer-2.0.12
+cleo @ file:///apps/sources/p/Python/extensions/cleo-0.8.1-py2.py3-none-any.whl
+click @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/click/click-8.1.3
+clikit @ file:///apps/sources/p/Python/extensions/clikit-0.6.2-py2.py3-none-any.whl
+colorama @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/colorama/colorama-0.4.4
+colorlog==6.8.0
+ConfigArgParse==1.7
+crashtest @ file:///apps/sources/p/Python/extensions/crashtest-0.3.1-py3-none-any.whl
+cryptography @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/cryptography/cryptography-37.0.1
+cycler @ file:///dev/shm/matplotlib/3.5.2/foss-2022a/Cycler/cycler-0.11.0
+Cython @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/Cython/Cython-0.29.28
+-e git+https://github.com/lucasjinreal/DCNv2_latest.git@864c2850a780979f817c126b0e1a363a941ce07b#egg=DCNv2
+deap @ file:///dev/shm/SciPybundle/2022.05/foss-2022a/deap/deap-1.3.1
+dearpygui==1.10.1
+decorator @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/decorator/decorator-5.1.1
+distlib @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/distlib/distlib-0.3.4
+docopt @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/docopt/docopt-0.6.2
+docutils @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/docutils/docutils-0.17.1
+ecdsa @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/ecdsa/ecdsa-0.17.0
+editables @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/editables/editables-0.3
+expecttest @ file:///dev/shm/expecttest/0.1.3/GCCcore-11.3.0/expecttest-0.1.3
+filelock @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/filelock/filelock-3.6.0
+flit @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/flit/flit-3.7.1
+flit_core @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/flitcore/flit_core-3.7.1
+fonttools @ file:///dev/shm/matplotlib/3.5.2/foss-2022a/fonttools/fonttools-4.34.0
+fsspec @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/fsspec/fsspec-2022.3.0
+future @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/future/future-0.18.2
+gast @ file:///dev/shm/SciPybundle/2022.05/foss-2022a/gast/gast-0.5.3
+glob2 @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/glob2/glob2-0.7
+google-auth @ file:///dev/shm/tensorboard/2.10.0/foss-2022a/googleauth/google-auth-2.11.1
+google-auth-oauthlib @ file:///dev/shm/tensorboard/2.10.0/foss-2022a/googleauthoauthlib/google-auth-oauthlib-0.4.6
+greenlet==3.0.1
+grpcio @ file:///dev/shm/tensorboard/2.10.0/foss-2022a/grpcio/grpcio-1.49.1
+html5lib @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/html5lib/html5lib-1.1
+idna @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/idna/idna-3.3
+imagecodecs==2023.9.18
+imageio==2.33.0
+imageio-ffmpeg==0.4.9
+imagesize @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/imagesize/imagesize-1.3.0
+importlib-metadata @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/importlib_metadata/importlib_metadata-4.11.3
+importlib-resources @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/importlib_resources/importlib_resources-5.7.1
+iniconfig @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/iniconfig/iniconfig-1.1.1
+intervaltree @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/intervaltree/intervaltree-3.1.0
+intreehooks @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/intreehooks/intreehooks-1.0
+ipaddress @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/ipaddress/ipaddress-1.0.23
+jeepney @ file:///apps/sources/p/Python/extensions/jeepney-0.8.0-py3-none-any.whl
+Jinja2 @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/Jinja2/Jinja2-3.1.2
+joblib==1.3.2
+jsonschema @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/jsonschema/jsonschema-4.4.0
+keyring @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/keyring/keyring-23.5.0
+keyrings.alt @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/keyringsalt/keyrings.alt-4.1.0
+kiwisolver @ file:///dev/shm/matplotlib/3.5.2/foss-2022a/kiwisolver/kiwisolver-1.4.3
+liac-arff @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/liacarff/liac-arff-2.5.0
+lightning-utilities==0.10.0
+lockfile @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/lockfile/lockfile-0.12.2
+lpips==0.1.4
+Mako==1.3.0
+Markdown @ file:///dev/shm/tensorboard/2.10.0/foss-2022a/Markdown/Markdown-3.4.1
+markdown-it-py==3.0.0
+MarkupSafe @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/MarkupSafe/MarkupSafe-2.1.1
+matplotlib @ file:///dev/shm/matplotlib/3.5.2/foss-2022a/matplotlib/matplotlib-3.5.2
+mdurl==0.1.2
+mock @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/mock/mock-4.0.3
+more-itertools @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/moreitertools/more-itertools-8.12.0
+mpi4py @ file:///dev/shm/SciPybundle/2022.05/foss-2022a/mpi4py/mpi4py-3.1.3
+mpmath @ file:///dev/shm/SciPybundle/2022.05/foss-2022a/mpmath/mpmath-1.2.1
+msgpack @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/msgpack/msgpack-1.0.3
+netaddr @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/netaddr/netaddr-0.8.0
+netifaces @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/netifaces/netifaces-0.11.0
+nibabel==5.2.0
+ninja==1.11.1.1
+numexpr @ file:///dev/shm/SciPybundle/2022.05/foss-2022a/numexpr/numexpr-2.8.1
+numpy @ file:///dev/shm/SciPybundle/2022.05/foss-2022a/numpy/numpy-1.22.3
+nvdiffrast @ git+https://github.com/NVlabs/nvdiffrast/@c5caf7bdb8a2448acc491a9faa47753972edd380
+oauthlib @ file:///dev/shm/tensorboard/2.10.0/foss-2022a/oauthlib/oauthlib-3.2.1
+opencv-contrib-python-headless==4.8.1.78
+opencv-python==4.8.1.78
+optuna==3.4.0
+packaging @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/packaging/packaging-20.9
+pandas @ file:///dev/shm/SciPybundle/2022.05/foss-2022a/pandas/pandas-1.4.2
+paramiko @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/paramiko/paramiko-2.10.4
+pastel @ file:///apps/sources/p/Python/extensions/pastel-0.2.1-py2.py3-none-any.whl
+pathlib2 @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/pathlib2/pathlib2-2.3.7.post1
+pathspec @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/pathspec/pathspec-0.9.0
+pbr @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/pbr/pbr-5.8.1
+pexpect @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/pexpect/pexpect-4.8.0
+Pillow @ file:///dev/shm/PillowSIMD/9.2.0/GCCcore-11.3.0/pillow-simd-9.2.0
+pkginfo @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/pkginfo/pkginfo-1.8.2
+platformdirs @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/platformdirs/platformdirs-2.4.1
+pluggy @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/pluggy/pluggy-1.0.0
+ply @ file:///dev/shm/SciPybundle/2022.05/foss-2022a/ply/ply-3.11
+poetry @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/poetry/poetry-1.1.13
+poetry-core @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/poetrycore/poetry-core-1.0.8
+portalocker @ file:///local/tmp.1486970/PyTorchbundle/1.13.1/foss-2022a-CUDA-11.7.0/portalocker/portalocker-2.7.0
+protobuf @ file:///dev/shm/protobufpython/3.19.4/GCCcore-11.3.0/protobuf-3.19.4
+psutil @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/psutil/psutil-5.9.0
+ptyprocess @ file:///apps/sources/p/Python/extensions/ptyprocess-0.7.0-py2.py3-none-any.whl
+py @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/py/py-1.11.0
+py-expression-eval @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/py_expression_eval/py_expression_eval-0.3.14
+pyasn1 @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/pyasn1/pyasn1-0.4.8
+pyasn1-modules @ file:///dev/shm/tensorboard/2.10.0/foss-2022a/pyasn1modules/pyasn1-modules-0.2.8
+pybind11 @ file:///dev/shm/pybind11/2.9.2/GCCcore-11.3.0/pybind11-2.9.2
+pycparser @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/pycparser/pycparser-2.21
+pycrypto @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/pycrypto/pycrypto-2.6.1
+Pygments==2.17.2
+pylev @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/pylev/pylev-1.4.0
+PyMCubes==0.1.4
+pymeshlab==2022.2.post3
+PyNaCl @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/PyNaCl/PyNaCl-1.5.0
+pyparsing @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/pyparsing/pyparsing-3.0.8
+pyrsistent @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/pyrsistent/pyrsistent-0.18.1
+pytest @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/pytest/pytest-7.1.2
+python-dateutil @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/pythondateutil/python-dateutil-2.8.2
+pythran @ file:///dev/shm/SciPybundle/2022.05/foss-2022a/pythran/pythran-0.11.0
+pytoml @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/pytoml/pytoml-0.1.21
+pytorch-ignite @ file:///local/tmp.1486970/PyTorchbundle/1.13.1/foss-2022a-CUDA-11.7.0/pytorchignite/ignite-0.4.12
+pytz @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/pytz/pytz-2022.1
+PyYAML @ file:///dev/shm/PyYAML/6.0/GCCcore-11.3.0/PyYAML-6.0
+regex @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/regex/regex-2022.4.24
+requests @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/requests/requests-2.27.1
+requests-oauthlib @ file:///dev/shm/tensorboard/2.10.0/foss-2022a/requestsoauthlib/requests-oauthlib-1.3.1
+requests-toolbelt @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/requeststoolbelt/requests-toolbelt-0.9.1
+rich==13.7.0
+rsa @ file:///dev/shm/tensorboard/2.10.0/foss-2022a/rsa/rsa-4.9
+scandir @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/scandir/scandir-1.10.0
+scikit-learn==1.3.2
+SciPy @ file:///dev/shm/SciPybundle/2022.05/foss-2022a/scipy/scipy-1.8.1
+SecretStorage @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/SecretStorage/SecretStorage-3.3.2
+semantic-version @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/semantic_version/semantic_version-2.9.0
+sentencepiece @ file:///dev/shm/SentencePiece/0.1.97/GCC-11.3.0/sentencepiece-0.1.97/python
+setuptools-rust @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/setuptoolsrust/setuptools-rust-1.3.0
+setuptools-scm @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/setuptools_scm/setuptools_scm-6.4.2
+shellingham @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/shellingham/shellingham-1.4.0
+simplegeneric @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/simplegeneric/simplegeneric-0.8.1
+simplejson @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/simplejson/simplejson-3.17.6
+six @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/six/six-1.16.0
+snowballstemmer @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/snowballstemmer/snowballstemmer-2.2.0
+sortedcontainers @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/sortedcontainers/sortedcontainers-2.4.0
+Sphinx @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/Sphinx/Sphinx-4.5.0
+sphinx-bootstrap-theme @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/sphinxbootstraptheme/sphinx-bootstrap-theme-0.8.1
+sphinxcontrib-applehelp @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/sphinxcontribapplehelp/sphinxcontrib-applehelp-1.0.2
+sphinxcontrib-devhelp @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/sphinxcontribdevhelp/sphinxcontrib-devhelp-1.0.2
+sphinxcontrib-htmlhelp @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/sphinxcontribhtmlhelp/sphinxcontrib-htmlhelp-2.0.0
+sphinxcontrib-jsmath @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/sphinxcontribjsmath/sphinxcontrib-jsmath-1.0.1
+sphinxcontrib-qthelp @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/sphinxcontribqthelp/sphinxcontrib-qthelp-1.0.3
+sphinxcontrib-serializinghtml @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/sphinxcontribserializinghtml/sphinxcontrib-serializinghtml-1.1.5
+sphinxcontrib-websupport @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/sphinxcontribwebsupport/sphinxcontrib-websupport-1.2.4
+SQLAlchemy==2.0.23
+tabulate @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/tabulate/tabulate-0.8.9
+tensorboard @ file:///apps/sources/t/tensorboard/extensions/tensorboard-2.10.0-py3-none-any.whl
+tensorboard-data-server @ file:///apps/sources/t/tensorboard/extensions/tensorboard_data_server-0.6.1-py3-none-any.whl
+tensorboard-plugin-wit @ file:///apps/sources/t/tensorboard/extensions/tensorboard_plugin_wit-1.8.1-py3-none-any.whl
+tensorboardX==2.6.2.2
+threadpoolctl @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/threadpoolctl/threadpoolctl-3.1.0
+tifffile==2023.9.26
+toml @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/toml/toml-0.10.2
+tomli @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/tomli/tomli-2.0.1
+tomli_w @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/tomli_w/tomli_w-1.0.0
+tomlkit @ file:///apps/sources/p/Python/extensions/tomlkit-0.10.2-py3-none-any.whl
+torch==1.13.1
+torch-efficient-distloss==0.1.3
+torch-ema==0.3
+torch-tb-profiler @ file:///local/tmp.1486970/PyTorchbundle/1.13.1/foss-2022a-CUDA-11.7.0/torchtbprofiler/torch_tb_profiler-0.4.3
+torchdata @ file:///local/tmp.1486970/PyTorchbundle/1.13.1/foss-2022a-CUDA-11.7.0/torchdata/data-0.5.1
+torchmetrics==1.2.1
+torchtext @ file:///local/tmp.1486970/PyTorchbundle/1.13.1/foss-2022a-CUDA-11.7.0/torchtext/text-0.14.1
+torchvision @ file:///local/tmp.1486970/PyTorchbundle/1.13.1/foss-2022a-CUDA-11.7.0/torchvision/vision-0.14.1
+tqdm @ file:///dev/shm/tqdm/4.64.0/GCCcore-11.3.0/tqdm-4.64.0
+trimesh==4.0.5
+typing_extensions @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/typing_extensions/typing_extensions-4.2.0
+ujson @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/ujson/ujson-5.2.0
+urllib3 @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/urllib3/urllib3-1.26.9
+virtualenv @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/virtualenv/virtualenv-20.14.1
+wcwidth @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/wcwidth/wcwidth-0.2.5
+webencodings @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/webencodings/webencodings-0.5.1
+Werkzeug @ file:///dev/shm/tensorboard/2.10.0/foss-2022a/Werkzeug/Werkzeug-2.2.2
+xatlas==0.0.8
+xlrd @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/xlrd/xlrd-2.0.1
+zipfile36 @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/zipfile36/zipfile36-0.1.3
+zipp @ file:///dev/shm/Python/3.10.4/GCCcore-11.3.0/zipp/zipp-3.8.0
