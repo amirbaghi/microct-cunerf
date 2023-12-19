@@ -8,4 +8,5 @@ module load SciPy-bundle/2022.05-foss-2022a matplotlib/3.5.2-foss-2022a
 module load PyTorch-bundle/1.13.1-foss-2022a-CUDA-11.7.0
 
 source ./microct_env/bin/activate
-python3 instant-NGP/model/main.py --rhino --fp16 --workspace "workspace_rhino"
+# python3 instant-NGP/model/main.py --rhino --fp16 --workspace "workspace_rhino"
+python3 cunerf/run_cunerf.py --no_reload --batch_steps 1 --fp16

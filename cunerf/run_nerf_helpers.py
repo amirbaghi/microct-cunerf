@@ -47,7 +47,8 @@ class CuNeRF(nn.Module):
         self.freq_range = torch.arange(self.freq, device='cuda')
             
         self.linears = nn.ModuleList(
-            [nn.Linear(input_ch * self.freq * 2, W)] + [nn.Linear(W, W if i != D-2 else W_last) if i not in self.skips else nn.Linear(W + (input_ch * self.freq * 2), W if i != D-2 else W_last) for i in range(D-1)])
+            # [nn.Linear(input_ch * self.freq * 2, W)] + [nn.Linear(W, W if i != D-2 else W_last) if i not in self.skips else nn.Linear(W + (input_ch * self.freq * 2), W if i != D-2 else W_last) for i in range(D-1)])
+            [nn.Linear(input_ch, W)] + [nn.Linear(W, W if i != D-2 else W_last) if i not in self.skips else nn.Linear(W + input_ch, W if i != D-2 else W_last) for i in range(D-1)])
 
         self.output_linear = nn.Linear(W_last, output_ch)
 
@@ -63,7 +64,8 @@ class CuNeRF(nn.Module):
     def forward(self, x):
         # TODO: We can encode the iputs in hash-grids
 
-        h = self.positional_encoding(x)
+        # h = self.positional_encoding(x)
+        h = x
 
         for i, l in enumerate(self.linears):
 
@@ -71,7 +73,8 @@ class CuNeRF(nn.Module):
             h = F.relu(h)
 
             if i in self.skips:
-                encoded_inps = self.positional_encoding(x)
+                # encoded_inps = self.positional_encoding(x)
+                encoded_inps = x
                 h = torch.cat([encoded_inps, h], -1)
 
         outputs = self.output_linear(h)
@@ -109,9 +112,11 @@ def adaptive_loss_fn(pixels, preds_coarse, preds_fine):
 
     # Adaptive Regularization Term
     # || pixels - preds_fine || ** 1/2
-    adapt_reg = torch.sqrt(torch.mean((pixels - preds_fine) ** 2))
+    # adapt_reg = torch.sqrt(torch.mean((pixels - preds_fine) ** 2))
+    
 
-    return adapt_reg * loss_coarse + loss_fine
+    # return adapt_reg * loss_coarse + loss_fine
+    return loss_coarse + loss_fine
 
 # Cube-sampling
 def get_cube_samples(n_samples, centers, length):
@@ -141,6 +146,10 @@ def calculate_color(samples):
     samples: (n_centers, n_samples, 3): (distance, density, color)
     return: (n_centers, 3)
     """
+
+    # Print the nan values in the samples
+    # print("Samples: ", samples)
+    # print("Samples Nan values: ", torch.isnan(samples).any())
 
     n_centers, n_samples, _ = samples.shape
 

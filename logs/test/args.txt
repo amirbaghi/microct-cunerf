@@ -1,6 +1,7 @@
 N_rand = 4096
 base_img_name = ./dataset/pp_174_tumor_Nr56_x4_StitchPag_stitch_2563x4381x2162
 basedir = ./logs/
+batch_steps = 1
 chunk = 32768
 config = None
 datadir = ./data/llff/fern
@@ -14,7 +15,7 @@ netchunk = 65536
 netdepth = 8
 netwidth = 256
 no_batching = False
-no_reload = False
+no_reload = True
 print_interval = 100
 render_only = False
 render_test = False

@@ -8,6 +8,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm, trange
+import hashlib
+import pickle
+
+from grad_viz import *
 
 import matplotlib.pyplot as plt
 
@@ -19,6 +23,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
 DEBUG = False
 
+def hash_state_dict(state_dict):
+    return hashlib.sha1(pickle.dumps(state_dict)).hexdigest()
 
 def render_view(model, H, W, translation, rotation, batch_size, savedir):
 
@@ -97,6 +103,7 @@ def config_parser():
                         help='frequency of console printout and metric loggin')
     parser.add_argument("--save_interval", type=int, default=10000,
                         help='frequency of metric saving')
+    parser.add_argument("--batch_steps", type=int, default=1,)
 
     parser.add_argument("--render_only", action='store_true', 
                         help='do not optimize, reload weights and render out render_poses path')
@@ -112,6 +119,8 @@ def train_step(model_coarse, model_fine, label, input, length, n_samples_c, n_sa
     # Sample for each point in X in a cube around it
     X_coarse_samples = get_cube_samples(n_samples_c, X, length)
 
+    print("Samples: ", torch.isnan(X_coarse_samples).any())
+
     # Get the coordinates and distances of the coarse samples for each center
     coords = X_coarse_samples[:, :, :3]
     distances = X_coarse_samples[:, :, 3]
@@ -119,6 +128,8 @@ def train_step(model_coarse, model_fine, label, input, length, n_samples_c, n_sa
     # Predict the color and density of the coarse samples
     coords_flat = torch.reshape(coords, [-1, coords.shape[-1]])
     colors_flat_c, densities_flat_c = model_coarse(coords_flat)
+    print(torch.isnan(colors_flat_c).any())
+    print(torch.isnan(densities_flat_c).any())
 
     # Reshape the flat output to the original input shape
     colors_c = torch.reshape(colors_flat_c, list(coords.shape[:-1]))
@@ -127,6 +138,7 @@ def train_step(model_coarse, model_fine, label, input, length, n_samples_c, n_sa
     # Evaluate the coarse color for each center pixel
     coarse_center_color = calculate_color(torch.cat((distances.unsqueeze(2), 
                                           densities_c.unsqueeze(2), colors_c.unsqueeze(2)), dim=2))
+    # print(torch.isnan(coarse_center_color).any())
 
     # Get fine samples for each center pixel
     fine_samples = get_cube_samples_hierarchical(n_samples_f, distances, densities_c)
@@ -143,11 +155,17 @@ def train_step(model_coarse, model_fine, label, input, length, n_samples_c, n_sa
     # Concatenate the distances of the coarse and fine samples
     distances_f = torch.cat((distances, fine_samples[:, :, 3]), dim=1)
 
-    # TODO: May need to sort the samples by distance
+    # print(distances_f.shape, densities_f.shape, colors_f.shape)
+
+    inds = distances_f.argsort(dim=1)
+    distances_f = distances_f.gather(1, inds)
+    densities_f = densities_f.gather(1, inds)
+    colors_f = colors_f.gather(1, inds)
 
     # Evaluate the fine color for each center pixel
     fine_center_color = calculate_color(torch.cat((distances_f.unsqueeze(2), 
                                         densities_f.unsqueeze(2), colors_f.unsqueeze(2)), dim=2))
+    # print(torch.isnan(fine_center_color).any())
 
     loss = adaptive_loss_fn(y, coarse_center_color, fine_center_color)
 
@@ -231,7 +249,7 @@ def cuNeRF_train():
     use_batching = not args.no_batching
 
     # Create dataset and dataloader for train and validation set
-    num_samples = 10
+    num_samples = 5000
     train_dataset = MicroCTVolume(colors, coords, H, W)
     train_loader = DataLoader(train_dataset, batch_size=num_samples, shuffle=True, generator=torch.Generator(device='cuda'))
 
@@ -248,6 +266,8 @@ def cuNeRF_train():
     global_step = 0
 
     min_loss = torch.inf
+    prev_model_coarse_state_dict_hash = hash_state_dict(model_coarse.state_dict())
+    prev_model_fine_state_dict_hash = hash_state_dict(model_fine.state_dict())
     for epoch in range(N_epocs):
 
         print(f'Epoch {epoch}...')
@@ -255,35 +275,63 @@ def cuNeRF_train():
         local_step = 0
         
         for batch in train_loader:
-            
-            colors = batch[0].to(device)
-            coords = batch[1].to(device)
 
-            optimizer.zero_grad()
+            # Check if the model weights have changed since the last iteration
+            if (hash_state_dict(model_coarse.state_dict()) != prev_model_coarse_state_dict_hash or
+                hash_state_dict(model_fine.state_dict()) != prev_model_fine_state_dict_hash):
+                print("Model weights have changed.")
+            else:
+                print("Model weights have not changed.")
 
-            with torch.cuda.amp.autocast(enabled=args.fp16):
+            prev_model_coarse_state_dict_hash = hash_state_dict(model_coarse.state_dict())
+            prev_model_fine_state_dict_hash = hash_state_dict(model_fine.state_dict())
+                        
+            for _ in range(args.batch_steps):
+
+                colors = batch[0].to(device)
+                coords = batch[1].to(device)
+
+                # with torch.cuda.amp.autocast(enabled=args.fp16):
                 preds, truths, loss = train_step(model_coarse, model_fine, colors, coords, 1, 64, 192)
+                    
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
                 
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+                # scaler.scale(loss).backward()
+                # scaler.step(optimizer)
+                # scaler.update()
 
-            # NOTE: IMPORTANT!
-            ###   update learning rate   ###
-            decay_rate = 0.1
-            decay_steps = args.lrate_decay * 1000
-            new_lrate = args.lrate * (decay_rate ** (global_step / decay_steps))
-            for param_group in optimizer.param_groups:
-                param_group['lr'] = new_lrate
+                model_coarse.zero_grad()
+                model_fine.zero_grad()
+
+                # NOTE: IMPORTANT!
+                ###   update learning rate   ###
+                decay_rate = 0.1
+                decay_steps = args.lrate_decay * 1000
+                new_lrate = args.lrate * (decay_rate ** (global_step / decay_steps))
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = new_lrate
+                    
+                if global_step % args.print_interval == 0:
+                    tqdm.write(f"[TRAIN] Step: {global_step} Loss: {loss}")
                 
-            if global_step % args.print_interval == 0:
-                tqdm.write(f"[TRAIN] Step: {global_step} Loss: {loss}")
-            
-            # Save checkpoint 
-            if global_step % args.save_interval==0:
-                if loss <= min_loss:
-                    min_loss = loss
-                    path = os.path.join(basedir, expname, '{:06d}.tar'.format(global_step))
+                # Save checkpoint 
+                if global_step % args.save_interval==0:
+                    if loss <= min_loss:
+                        min_loss = loss
+                        path = os.path.join(basedir, expname, '{:06d}.tar'.format(global_step))
+                        torch.save({
+                            'global_step': global_step,
+                            'network_fn_state_dict': model_coarse.state_dict(),
+                            'network_fine_state_dict': model_fine.state_dict(),
+                            'optimizer_state_dict': optimizer.state_dict(),
+                        }, path)
+                        print('Saved checkpoints at', path)
+
+                # Save the latest ckpt every 500 steps
+                if global_step % 500 == 0 and global_step > 0:
+                    path = os.path.join(basedir, expname, '{:06d}_latest.tar'.format(global_step))
                     torch.save({
                         'global_step': global_step,
                         'network_fn_state_dict': model_coarse.state_dict(),
@@ -292,19 +340,8 @@ def cuNeRF_train():
                     }, path)
                     print('Saved checkpoints at', path)
 
-            # Save the latest ckpt every 500 steps
-            if global_step % 500 == 0 and global_step > 0:
-                path = os.path.join(basedir, expname, '{:06d}_latest.tar'.format(global_step))
-                torch.save({
-                    'global_step': global_step,
-                    'network_fn_state_dict': model_coarse.state_dict(),
-                    'network_fine_state_dict': model_fine.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                }, path)
-                print('Saved checkpoints at', path)
-
-            global_step += 1
-            local_step += 1
+                global_step += 1
+                local_step += 1
 
 
 if __name__=='__main__':

@@ -89,17 +89,21 @@ def load_tiff_images(start_index, end_index, base_img_name, resize_factor=1):
     for slice_img in range(start_index, end_index + 1):
         imgpath = base_img_name + "-" + '{:04d}'.format(slice_img) + '.tif'
         img = tiff.imread(imgpath)
+
         img = img.astype('float32')
-        # TODO: Resize image
+
+        # Normalize pixel values between 0 and 1
+        img_min = img.min()
+        img_max = img.max()
+        img = (img - img_min) / (img_max - img_min)
+
         H, W = int(img.shape[0] / resize_factor), int(img.shape[1] / resize_factor)
         transform = Compose([
             ToTensor(),
-            Resize((H, W), interpolation=InterpolationMode.BICUBIC),
-            Normalize(torch.Tensor([0]), torch.Tensor([img.max()]))
+            Resize((H, W), interpolation=InterpolationMode.NEAREST)
         ])
         img = transform(img)[0]
         colors.append(img)
-        
 
     colors = torch.stack(colors)
     coords = get_mgrid(H, W, (end_index + 1)-start_index)
