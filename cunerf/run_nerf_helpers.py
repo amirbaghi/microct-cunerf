@@ -3,11 +3,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+from gridencoder import GridEncoder
 
 from torch.utils.data import Dataset, DataLoader
 
 # Misc
-img2mse = lambda x, y : torch.mean((x - y) ** 2)
+# img2mse = lambda x, y : torch.mean((x - y) ** 2)
+img2mse = lambda x, y : torch.mean((x - y))
 mse2psnr = lambda x : -10. * torch.log(x) / torch.log(torch.Tensor([10.]))
 to8b = lambda x : (255*np.clip(x,0,1)).astype(np.uint8)
 
@@ -37,24 +39,26 @@ class MicroCTVolume(Dataset):
 
 # CuNeRF Model
 class CuNeRF(nn.Module):
-    def __init__(self, D=9, W=256, W_last=128, input_ch=3, output_ch=2, skips=[4, 7], freq=10):
+    def __init__(self, D=9, W=256, W_last=128, input_ch=3, output_ch=2, skips=[4, 7], freq=10, num_levels=10, level_dim=2, base_resolution=16, log2_hashmap_size=19, desired_resolution=2048, align_corners=False):
         super(CuNeRF, self).__init__()
         self.D = D
         self.W = W
         self.input_ch = input_ch
         self.skips = skips
-        self.freq = freq
-        self.freq_range = torch.arange(self.freq, device='cuda')
+        # self.freq = freq
+        # self.freq_range = torch.arange(self.freq, device='cuda')
+        self.encoder = GridEncoder(input_dim=input_ch, num_levels=num_levels, level_dim=level_dim, base_resolution=base_resolution, 
+                                    log2_hashmap_size=log2_hashmap_size, desired_resolution=desired_resolution, gridtype='hash', align_corners=align_corners)
+        self.in_dim = self.encoder.output_dim
             
         self.linears = nn.ModuleList(
-            # [nn.Linear(input_ch * self.freq * 2, W)] + [nn.Linear(W, W if i != D-2 else W_last) if i not in self.skips else nn.Linear(W + (input_ch * self.freq * 2), W if i != D-2 else W_last) for i in range(D-1)])
-            [nn.Linear(input_ch, W)] + [nn.Linear(W, W if i != D-2 else W_last) if i not in self.skips else nn.Linear(W + input_ch, W if i != D-2 else W_last) for i in range(D-1)])
+            [nn.Linear(self.in_dim, W)] + [nn.Linear(W, W if i != D-2 else W_last) if i not in self.skips else nn.Linear(W + self.in_dim, W if i != D-2 else W_last) for i in range(D-1)])
+            # [nn.Linear(input_ch, W)] + [nn.Linear(W, W if i != D-2 else W_last) if i not in self.skips else nn.Linear(W + input_ch, W if i != D-2 else W_last) for i in range(D-1)])
 
         self.output_linear = nn.Linear(W_last, output_ch)
 
     # Positional encoding
     def positional_encoding(self, x):
-        # x = x.unsqueeze(-1) # TODO: may need to remove.
         # Create a tensor of powers of 2
         scales = 2.0 ** self.freq_range
         # Compute sin and cos features
@@ -62,10 +66,7 @@ class CuNeRF(nn.Module):
         return features
 
     def forward(self, x):
-        # TODO: We can encode the iputs in hash-grids
-
-        # h = self.positional_encoding(x)
-        h = x
+        h = self.encoder(x)
 
         for i, l in enumerate(self.linears):
 
@@ -73,8 +74,7 @@ class CuNeRF(nn.Module):
             h = F.relu(h)
 
             if i in self.skips:
-                # encoded_inps = self.positional_encoding(x)
-                encoded_inps = x
+                encoded_inps = self.encoder(x)
                 h = torch.cat([encoded_inps, h], -1)
 
         outputs = self.output_linear(h)
@@ -96,27 +96,28 @@ def adaptive_loss_fn(pixels, preds_coarse, preds_fine):
     # Remove singleton dimension from pixels
     pixels = pixels.squeeze(1)
 
-    print("Pixels: ", pixels)
-    print("Preds_coarse:", preds_coarse)
-    print("Preds_fine:", preds_fine, end="\n\n")
+    # print("Adaptive Loss Function -------------------")
+    # print("Pixels: ", pixels)
+    # print("Preds_coarse:", preds_coarse)
+    # print("Preds_fine:", preds_fine, end="\n\n")
 
     # MSE Loss between pixels and coarse predictions
     loss_coarse = loss_fn(preds_coarse, pixels)
 
-    print(loss_coarse)
+    # print(loss_coarse)
 
     # MSE Loss between pixels and fine predictions
     loss_fine = loss_fn(preds_fine, pixels)
 
-    print(loss_fine)
+    # print(loss_fine)
 
-    # Adaptive Regularization Term
+    # Adaptive Regularization Term 
     # || pixels - preds_fine || ** 1/2
-    # adapt_reg = torch.sqrt(torch.mean((pixels - preds_fine) ** 2))
-    
+    adapt_reg = torch.sqrt(loss_fine)
 
     # return adapt_reg * loss_coarse + loss_fine
-    return loss_coarse + loss_fine
+    return adapt_reg * loss_coarse + loss_fine
+    # return loss_fine
 
 # Cube-sampling
 def get_cube_samples(n_samples, centers, length):
@@ -125,11 +126,11 @@ def get_cube_samples(n_samples, centers, length):
     The returned coordinates are sorted by their distances to the centers
     return: (centers, n_samples, 4) => (x, y, z, distance)
     """
-
     samples = []
     for center in centers:
         center_samples = torch.rand((n_samples, 3)) - 0.5
         center_samples = center_samples * length + center
+
         distances = torch.norm(center_samples - center, dim=-1, keepdim=True)
         center_samples = torch.cat([center_samples, distances], dim=-1)
         samples.append(center_samples)
@@ -157,16 +158,33 @@ def calculate_color(samples):
     distance_diffs = samples[:, 1:, 0] - samples[:, :-1, 0]
 
     # Calculate the numerators
-    numerators = samples[:, :-1, 0]**2 * (1 - torch.exp(-samples[:, :-1, 1] * distance_diffs))
+    numerators =  (samples[:, :-1, 0]**2) * (1 - torch.exp(-samples[:, :-1, 1] * distance_diffs))
 
     # Calculate the denominators
-    denominators = torch.cumsum(samples[:, :-1, 0]**2 * samples[:, :-1, 1] * distance_diffs, dim=1)
-    denominators *= 4 * np.pi
+    denominators = torch.cumsum((samples[:, :-1, 0]**2) * samples[:, :-1, 1] * distance_diffs, dim=1)
+    # print("Max distance diffs: ", torch.max(distance_diffs))
+    # print("Max distances: ", torch.max(samples[:, :-1, 0]))
+    # print("Max densities: ", torch.max(samples[:, :-1, 1]))
+    # print(denominators.shape)
+    denominators = denominators * 4 * np.pi
+    # print("Denominator nans: ", torch.isnan(denominators).any())
+    # print("Denominator max: ", torch.max(denominators))
+    # print(denominators[0])
+    # print
+    # print(denominators[0][-1])
+    denominators = torch.clamp(denominators, max=88)  # 88 is approximately the maximum input to exp() that will not overflow
+# denominators = torch.exp(denominators)
     denominators = torch.exp(denominators)
+    # print(denominators[0])
+
+    # print("Calculate Color Values -------------------")
+    # print("Numerator nans: ", torch.isnan(numerators).any())
 
     # Calculate the colors
-    colors = torch.sum(numerators / denominators * samples[:, :-1, 2], dim=1)
-    colors *= 4 * np.pi
+    values = numerators / denominators * samples[:, :-1, 2]
+    # print("Values nans: ", torch.isnan(values).any())
+    colors = torch.sum(values, dim=1)
+    colors = colors * 4 * np.pi
 
     return colors
 
@@ -205,6 +223,8 @@ def get_cube_samples_hierarchical(n_samples, distances, densities):
 
     # Get new distances using ITS on the distances and densities of the course samples
     new_distances = sample_pdf(distances, densities, n_samples, det=False, pytest=False)
+
+    # print("Max new distances: ", torch.max(new_distances))
 
     thetas = torch.rand((n_centers, n_samples)) * 2 * np.pi
     phis = torch.rand((n_centers, n_samples)) * np.pi
@@ -272,7 +292,7 @@ def sample_pdf(bins, weights, N_samples, det=False, pytest=False):
 
     denom = (cdf_g[...,1]-cdf_g[...,0])
     denom = torch.where(denom<1e-5, torch.ones_like(denom), denom)
-    t = (u-cdf_g[...,0])/denom
+    t = (u-cdf_g[...,0]) * denom
     samples = bins_g[...,0] + t * (bins_g[...,1]-bins_g[...,0])
 
     return samples

@@ -26,8 +26,14 @@ def register_hooks(var):
 
     def is_bad_grad(grad_output):
             if grad_output is None:
+                    print("Grad output is None.")   
                     return True
             grad_output = grad_output.data
+            if grad_output.ne(grad_output).any() or grad_output.gt(1e6).any():
+                # print("Grad output: ", grad_output)
+                # print("Grad output data: ", grad_output.data)
+                print("Grad output ne: ", grad_output.ne(grad_output).any())
+                print("Grad output gt: ", grad_output.gt(1e6).any())
             return grad_output.ne(grad_output).any() or grad_output.gt(1e6).any()
 
     def make_dot():
