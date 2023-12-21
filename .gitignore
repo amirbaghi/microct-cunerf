@@ -5,3 +5,5 @@ microct_env/
 checkpoints/
 
 video-inr/
+
+*.png

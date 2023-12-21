@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from gridencoder import GridEncoder
+# from gridencoder import GridEncoder
 
 from torch.utils.data import Dataset, DataLoader
 
@@ -45,15 +45,15 @@ class CuNeRF(nn.Module):
         self.W = W
         self.input_ch = input_ch
         self.skips = skips
-        # self.freq = freq
-        # self.freq_range = torch.arange(self.freq, device='cuda')
-        self.encoder = GridEncoder(input_dim=input_ch, num_levels=num_levels, level_dim=level_dim, base_resolution=base_resolution, 
-                                    log2_hashmap_size=log2_hashmap_size, desired_resolution=desired_resolution, gridtype='hash', align_corners=align_corners)
-        self.in_dim = self.encoder.output_dim
+        self.freq = freq
+        self.freq_range = torch.arange(self.freq, device='cuda')
+        self.in_dim = self.input_ch * self.freq * 2
+        # self.encoder = GridEncoder(input_dim=input_ch, num_levels=num_levels, level_dim=level_dim, base_resolution=base_resolution, 
+                                    # log2_hashmap_size=log2_hashmap_size, desired_resolution=desired_resolution, gridtype='hash', align_corners=align_corners)
+        # self.in_dim = self.encoder.output_dim
             
         self.linears = nn.ModuleList(
             [nn.Linear(self.in_dim, W)] + [nn.Linear(W, W if i != D-2 else W_last) if i not in self.skips else nn.Linear(W + self.in_dim, W if i != D-2 else W_last) for i in range(D-1)])
-            # [nn.Linear(input_ch, W)] + [nn.Linear(W, W if i != D-2 else W_last) if i not in self.skips else nn.Linear(W + input_ch, W if i != D-2 else W_last) for i in range(D-1)])
 
         self.output_linear = nn.Linear(W_last, output_ch)
 
@@ -66,7 +66,9 @@ class CuNeRF(nn.Module):
         return features
 
     def forward(self, x):
-        h = self.encoder(x)
+        # h = self.encoder(x)
+
+        h = self.positional_encoding(x)
 
         for i, l in enumerate(self.linears):
 
@@ -74,7 +76,8 @@ class CuNeRF(nn.Module):
             h = F.relu(h)
 
             if i in self.skips:
-                encoded_inps = self.encoder(x)
+                # encoded_inps = self.encoder(x)
+                encoded_inps = self.positional_encoding(x)
                 h = torch.cat([encoded_inps, h], -1)
 
         outputs = self.output_linear(h)
@@ -117,6 +120,7 @@ def adaptive_loss_fn(pixels, preds_coarse, preds_fine):
 
     # return adapt_reg * loss_coarse + loss_fine
     return adapt_reg * loss_coarse + loss_fine
+    # return loss_coarse + loss_fine
     # return loss_fine
 
 # Cube-sampling
@@ -281,12 +285,15 @@ def sample_pdf(bins, weights, N_samples, det=False, pytest=False):
     # Invert CDF
     u = u.contiguous()
     inds = torch.searchsorted(cdf, u, right=True)
-    below = torch.max(torch.zeros_like(inds-1), inds-1)
+    below = torch.max(torch.zeros_like(inds-1), torch.min(inds-1, (bins.shape[-1]-1) * torch.ones_like(inds)))
     above = torch.min((bins.shape[-1]-1) * torch.ones_like(inds), inds)
     inds_g = torch.stack([below, above], -1)  # (batch, N_samples, 2)
 
+    # print(inds_g)
     matched_shape = [inds_g.shape[0], inds_g.shape[1], cdf.shape[-1]]
 
+    # print("Cdf_g: ", matched_shape)
+    # print("Bins_g: ", (matched_shape[0], matched_shape[1], matched_shape[2]-1))
     cdf_g = torch.gather(cdf.unsqueeze(1).expand(matched_shape), 1, inds_g)
     bins_g = torch.gather(bins.unsqueeze(1).expand((matched_shape[0], matched_shape[1], matched_shape[2]-1)), 1, inds_g)
 

@@ -11,4 +11,4 @@ module load Graphviz/5.0.0-GCCcore-11.3.0
 source ./microct_env/bin/activate
 # python3 instant-NGP/model/main.py --rhino --fp16 --workspace "workspace_rhino"
 # python3 cunerf/run_cunerf.py --no_reload --batch_steps 1 --fp16
-python3 cunerf/run_cunerf.py --no_reload --fp16
+python3 cunerf/run_cunerf.py --fp16 --expname "test" --batch_steps 1
