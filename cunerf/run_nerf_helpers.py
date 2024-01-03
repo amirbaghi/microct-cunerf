@@ -134,6 +134,7 @@ def get_cube_samples(n_samples, centers, length):
     for center in centers:
         center_samples = torch.rand((n_samples, 3)) - 0.5
         center_samples = center_samples * length + center
+        # print("Center: ", center_samples)   
 
         distances = torch.norm(center_samples - center, dim=-1, keepdim=True)
         center_samples = torch.cat([center_samples, distances], dim=-1)

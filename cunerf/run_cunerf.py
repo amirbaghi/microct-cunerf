@@ -359,7 +359,7 @@ def cuNeRF_train():
 
     start, optimizer, model_coarse, model_fine = load_checkpoint(args, basedir, expname, optimizer, model_coarse, model_fine)
 
-    length = 0.25
+    length = torch.tensor([0.15, 0.15, 0.1])
 
     global_step = start
 
@@ -379,7 +379,7 @@ def cuNeRF_train():
     use_batching = not args.no_batching
 
     # Create dataset and dataloader for train and validation set
-    num_samples = 2000
+    num_samples = 20000
     train_dataset = MicroCTVolume(colors, coords, H, W)
     train_loader = DataLoader(train_dataset, batch_size=num_samples, shuffle=True, generator=torch.Generator(device='cuda'))
 
@@ -411,7 +411,7 @@ def cuNeRF_train():
 
                 
                 with torch.cuda.amp.autocast(enabled=args.fp16):
-                    preds, truths, loss, preds_coarse  = train_step(model_coarse, model_fine, colors, coords, length, 128, 384)
+                    preds, truths, loss, preds_coarse  = train_step(model_coarse, model_fine, colors, coords, length, 64, 192)
                         
                     # optimizer.zero_grad()
                     # loss.backward()
@@ -462,11 +462,11 @@ def cuNeRF_train():
                 }, path)
                 print('Saved checkpoints at', path)
 
-            # Decay the length of the cube after a few steps to focus on the fine details
-            if global_step % 100 == 0 and global_step > 0:
-                length = length * 0.9
-                length = max(length, 0.1)
-                print("Current length of cube: ", length)
+            # # Decay the length of the cube after a few steps to focus on the fine details
+            # if global_step % 100 == 0 and global_step > 0:
+            #     length = length * 0.9
+            #     length = max(length, torch.tensor([0.1, 0.1, 0.1]).to(device)
+            #     print("Current length of cube: ", length)
 
             global_step += 1
             local_step += 1
