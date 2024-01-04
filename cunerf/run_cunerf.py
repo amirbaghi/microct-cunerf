@@ -31,7 +31,7 @@ DEBUG = False
 def hash_state_dict(state_dict):
     return hashlib.sha1(pickle.dumps(state_dict)).hexdigest()
 
-def render_view(model_coarse, model_fine, n_samples_c, n_samples_f, length, H, W, translation, rotation, batch_size, savedir):
+def render_view(model_coarse, n_samples_c, length, H, W, translation, rotation, batch_size, savedir):
 
     print(f'Rendering new view with {translation} and {rotation}')
 
@@ -53,36 +53,40 @@ def render_view(model_coarse, model_fine, n_samples_c, n_samples_f, length, H, W
 
         # Predict the color and density of the coarse samples
         coords_flat = torch.reshape(coords_c, [-1, coords_c.shape[-1]])
-        _, densities_flat_c = model_coarse(coords_flat)
+        colors_flat_c, densities_flat_c = model_coarse(coords_flat)
 
         # Reshape the flat output to the original input shape
+        colors_c = torch.reshape(colors_flat_c, list(coords.shape[:-1]))
         densities_c = torch.reshape(densities_flat_c, list(coords_c.shape[:-1]))
 
-        # Get fine samples for each center pixel
-        fine_samples = get_cube_samples_hierarchical(n_samples_f, distances, densities_c)
+        # # Get fine samples for each center pixel
+        # fine_samples = get_cube_samples_hierarchical(n_samples_f, distances, densities_c)
 
-        # Predict the color and density of the fine samples
-        fine_coords = torch.cat((coords_c, fine_samples[:, :,:3]), dim=1)
-        fine_coords_flat = torch.reshape(fine_coords, [-1, fine_coords.shape[-1]])
-        colors_flat_f, densities_flat_f = model_fine(fine_coords_flat)
+        # # Predict the color and density of the fine samples
+        # fine_coords = torch.cat((coords_c, fine_samples[:, :,:3]), dim=1)
+        # fine_coords_flat = torch.reshape(fine_coords, [-1, fine_coords.shape[-1]])
+        # colors_flat_f, densities_flat_f = model_fine(fine_coords_flat)
 
-        # Reshape the flat output to the original input shape
-        colors_f = torch.reshape(colors_flat_f, list(fine_coords.shape[:-1]))
-        densities_f = torch.reshape(densities_flat_f, list(fine_coords.shape[:-1]))
+        # # Reshape the flat output to the original input shape
+        # colors_f = torch.reshape(colors_flat_f, list(fine_coords.shape[:-1]))
+        # densities_f = torch.reshape(densities_flat_f, list(fine_coords.shape[:-1]))
 
-        # Concatenate the distances of the coarse and fine samples
-        distances_f = torch.cat((distances, fine_samples[:, :, 3]), dim=1)
+        # # Concatenate the distances of the coarse and fine samples
+        # distances_f = torch.cat((distances, fine_samples[:, :, 3]), dim=1)
 
-        inds = distances_f.argsort(dim=1)
-        distances_f = distances_f.gather(1, inds)
-        densities_f = densities_f.gather(1, inds)
-        colors_f = colors_f.gather(1, inds)
+        # inds = distances_f.argsort(dim=1)
+        # distances_f = distances_f.gather(1, inds)
+        # densities_f = densities_f.gather(1, inds)
+        # colors_f = colors_f.gather(1, inds)
 
-        # Evaluate the fine color for each center pixel
-        fine_center_color = calculate_color(torch.cat((distances_f.unsqueeze(2), 
-                                            densities_f.unsqueeze(2), colors_f.unsqueeze(2)), dim=2))
+        # fine_center_color = calculate_color(torch.cat((distances_f.unsqueeze(2), 
+        #                                     densities_f.unsqueeze(2), colors_f.unsqueeze(2)), dim=2))
 
-        rgbs.append(fine_center_color.cpu().detach().numpy())
+        # Evaluate the coarse color for each center pixel
+        coarse_center_color = calculate_color(torch.cat((distances.unsqueeze(2), 
+                                          densities_c.unsqueeze(2), colors_c.unsqueeze(2)), dim=2))
+
+        rgbs.append(coarse_center_color.cpu().detach().numpy())
     
     # Save the predicted RGBs as a 16-bit grayscale image
     if savedir is not None:
@@ -151,7 +155,7 @@ def config_parser():
 
     return parser
 
-def evaluate_step(model_coarse, model_fine, loader, H, W, n_samples_c, n_samples_f, length, global_step):
+def evaluate_step(model_coarse, loader, H, W, n_samples_c, length, global_step, basedir, expname):
     total_loss = 0
     step = 0
 
@@ -163,7 +167,6 @@ def evaluate_step(model_coarse, model_fine, loader, H, W, n_samples_c, n_samples
         X = X.view(-1, 3)
 
         # Sample for each point in X in a cube around it
-        # print(X.
         X_coarse_samples = get_cube_samples(n_samples_c, X, length)
 
         # Get the coordinates and distances of the coarse samples for each center
@@ -172,40 +175,43 @@ def evaluate_step(model_coarse, model_fine, loader, H, W, n_samples_c, n_samples
 
         # Predict the color and density of the coarse samples
         coords_flat = torch.reshape(coords, [-1, coords.shape[-1]])
-        _, densities_flat_c = model_coarse(coords_flat)
+        colors_flat_c, densities_flat_c = model_coarse(coords_flat)
 
         # Reshape the flat output to the original input shape
+        colors_c = torch.reshape(colors_flat_c, list(coords.shape[:-1]))
         densities_c = torch.reshape(densities_flat_c, list(coords.shape[:-1]))
 
-        # Get fine samples for each center pixel
-        fine_samples = get_cube_samples_hierarchical(n_samples_f, distances, densities_c)
+        # # Get fine samples for each center pixel
+        # fine_samples = get_cube_samples_hierarchical(n_samples_f, distances, densities_c)
 
-        # Predict the color and density of the fine samples
-        fine_coords = torch.cat((coords, fine_samples[:, :,:3]), dim=1)
-        fine_coords_flat = torch.reshape(fine_coords, [-1, fine_coords.shape[-1]])
-        colors_flat_f, densities_flat_f = model_fine(fine_coords_flat)
+        # # Predict the color and density of the fine samples
+        # fine_coords = torch.cat((coords, fine_samples[:, :,:3]), dim=1)
+        # fine_coords_flat = torch.reshape(fine_coords, [-1, fine_coords.shape[-1]])
+        # colors_flat_f, densities_flat_f = model_fine(fine_coords_flat)
 
-        # Reshape the flat output to the original input shape
-        colors_f = torch.reshape(colors_flat_f, list(fine_coords.shape[:-1]))
-        densities_f = torch.reshape(densities_flat_f, list(fine_coords.shape[:-1]))
+        # # Reshape the flat output to the original input shape
+        # colors_f = torch.reshape(colors_flat_f, list(fine_coords.shape[:-1]))
+        # densities_f = torch.reshape(densities_flat_f, list(fine_coords.shape[:-1]))
 
-        # Concatenate the distances of the coarse and fine samples
-        distances_f = torch.cat((distances, fine_samples[:, :, 3]), dim=1)
+        # # Concatenate the distances of the coarse and fine samples
+        # distances_f = torch.cat((distances, fine_samples[:, :, 3]), dim=1)
 
-        inds = distances_f.argsort(dim=1)
-        distances_f = distances_f.gather(1, inds)
-        densities_f = densities_f.gather(1, inds)
-        colors_f = colors_f.gather(1, inds)
+        # inds = distances_f.argsort(dim=1)
+        # distances_f = distances_f.gather(1, inds)
+        # densities_f = densities_f.gather(1, inds)
+        # colors_f = colors_f.gather(1, inds)
 
-        # Evaluate the fine color for each center pixel
-        fine_center_color = calculate_color(torch.cat((distances_f.unsqueeze(2), 
-                                            densities_f.unsqueeze(2), colors_f.unsqueeze(2)), dim=2))
+        # # Evaluate the fine color for each center pixel
+        # fine_center_color = calculate_color(torch.cat((distances_f.unsqueeze(2), 
+        #                                     densities_f.unsqueeze(2), colors_f.unsqueeze(2)), dim=2))
 
+        # Evaluate the coarse color for each center pixel
+        coarse_center_color = calculate_color(torch.cat((distances.unsqueeze(2), 
+                                          densities_c.unsqueeze(2), colors_c.unsqueeze(2)), dim=2))
         # loss = torch.nn.MSELoss()(y.squeeze(1), fine_center_color)
 
         ground_truth.append(y.squeeze(1).cpu().detach().numpy())
-        predictions.append(fine_center_color.cpu().detach().numpy())
-
+        predictions.append(coarse_center_color.cpu().detach().numpy())
 
     # Calculate loss between the ground truth and the predictions
     ground_truth = np.concatenate(ground_truth, axis=0)
@@ -231,12 +237,13 @@ def evaluate_step(model_coarse, model_fine, loader, H, W, n_samples_c, n_samples
     predictions = np.clip(predictions, 0, 1)
     predictions = (predictions * 65535).astype(np.uint16)
     filename = f'{global_step}_pred_eval.png'
+    filename = os.path.join(basedir, expname, filename)
     predictions = np.array(predictions, dtype=np.uint16)
     plt.imsave(filename, predictions, cmap="gray")
 
-    return fine_center_color, y, average_loss, psnr, ssim
+    return coarse_center_color, y, average_loss, psnr, ssim
 
-def train_step(model_coarse, model_fine, label, input, length, n_samples_c, n_samples_f):
+def train_step(model_coarse, label, input, length, n_samples_c):
     X = input # [N, 3]
     y = label
     
@@ -260,43 +267,42 @@ def train_step(model_coarse, model_fine, label, input, length, n_samples_c, n_sa
                                           densities_c.unsqueeze(2), colors_c.unsqueeze(2)), dim=2))
 
     # Get fine samples for each center pixel
-    fine_samples = get_cube_samples_hierarchical(n_samples_f, distances, densities_c)
+    # fine_samples = get_cube_samples_hierarchical(n_samples_f, distances, densities_c)
 
-    # Predict the color and density of the fine samples
-    fine_coords = torch.cat((coords, fine_samples[:, :,:3]), dim=1)
-    fine_coords_flat = torch.reshape(fine_coords, [-1, fine_coords.shape[-1]])
-    colors_flat_f, densities_flat_f = model_fine(fine_coords_flat)
+    # # Predict the color and density of the fine samples
+    # fine_coords = torch.cat((coords, fine_samples[:, :,:3]), dim=1)
+    # fine_coords_flat = torch.reshape(fine_coords, [-1, fine_coords.shape[-1]])
+    # colors_flat_f, densities_flat_f = model_fine(fine_coords_flat)
 
-    # Reshape the flat output to the original input shape
-    colors_f = torch.reshape(colors_flat_f, list(fine_coords.shape[:-1]))
-    densities_f = torch.reshape(densities_flat_f, list(fine_coords.shape[:-1]))
+    # # Reshape the flat output to the original input shape
+    # colors_f = torch.reshape(colors_flat_f, list(fine_coords.shape[:-1]))
+    # densities_f = torch.reshape(densities_flat_f, list(fine_coords.shape[:-1]))
 
     # Concatenate the distances of the coarse and fine samples
-    distances_f = torch.cat((distances, fine_samples[:, :, 3]), dim=1)
+    # distances_f = torch.cat((distances, fine_samples[:, :, 3]), dim=1)
 
-    inds = distances_f.argsort(dim=1)
-    distances_f = distances_f.gather(1, inds)
-    densities_f = densities_f.gather(1, inds)
-    colors_f = colors_f.gather(1, inds)
+    # inds = distances_f.argsort(dim=1)
+    # distances_f = distances_f.gather(1, inds)
+    # densities_f = densities_f.gather(1, inds)
+    # colors_f = colors_f.gather(1, inds)
 
-    # Evaluate the fine color for each center pixel
-    fine_center_color = calculate_color(torch.cat((distances_f.unsqueeze(2), 
-                                        densities_f.unsqueeze(2), colors_f.unsqueeze(2)), dim=2))
+    # # Evaluate the fine color for each center pixel
+    # fine_center_color = calculate_color(torch.cat((distances_f.unsqueeze(2), 
+    #                                     densities_f.unsqueeze(2), colors_f.unsqueeze(2)), dim=2))
 
+    loss = adaptive_loss_fn(y, coarse_center_color)
 
-    loss = adaptive_loss_fn(y, coarse_center_color, fine_center_color)
+    return coarse_center_color, y, loss
 
-    return fine_center_color, y, loss, coarse_center_color
-
-def evaluate(model_c, model_f, eval_loader, H, W, n_samples_c, n_samples_f, length, fp16, global_step):
+def evaluate(model_c, eval_loader, H, W, n_samples_c, length, fp16, global_step, basedir, expname):
         with torch.no_grad():
             with torch.cuda.amp.autocast(enabled=fp16):
-                preds, truths, average_loss, psnr, ssim = evaluate_step(model_c, model_f, eval_loader, H, W, n_samples_c, n_samples_f, length, global_step)
+                preds, truths, average_loss, psnr, ssim = evaluate_step(model_c, eval_loader, H, W, n_samples_c, length, global_step, basedir, expname)
             print("Average Evaluation Loss: ", average_loss)
             print("PSNR: ", psnr)
             print("SSIM: ", ssim)
     
-def load_checkpoint(args, basedir, expname, optimizer, model_coarse, model_fine):
+def load_checkpoint(args, basedir, expname, optimizer, model_coarse):
      # Load checkpoints
     if args.ft_path is not None and args.ft_path!='None':
         ckpts = [args.ft_path]
@@ -315,9 +321,9 @@ def load_checkpoint(args, basedir, expname, optimizer, model_coarse, model_fine)
 
         # Load model
         model_coarse.load_state_dict(ckpt['network_fn_state_dict'])
-        if model_fine is not None:
-            model_fine.load_state_dict(ckpt['network_fine_state_dict'])
-    return start, optimizer, model_coarse, model_fine
+        # if model_fine is not None:
+        #     model_fine.load_state_dict(ckpt['network_fine_state_dict'])
+    return start, optimizer, model_coarse
 
 def cuNeRF_train():
     parser = config_parser()
@@ -328,17 +334,20 @@ def cuNeRF_train():
     end_index = args.end_index
 
     # Load data and create models
-    colors, coords, H, W = load_tiff_images(start_index, end_index, base_img_name, resize_factor=10)
+    colors, coords, H, W = load_tiff_images(start_index, end_index, base_img_name, resize_factor=4)
     H, W = int(H), int(W)
 
-    model_coarse = CuNeRF(D=10, W=256, W_last=128, input_ch=3, output_ch=2, skips=[4, 8], freq=30, 
-                         num_levels=16, level_dim=2, base_resolution=16, log2_hashmap_size=13, desired_resolution=H) 
-    model_fine = CuNeRF(D=10, W=256, W_last=128, input_ch=3, output_ch=2, skips=[4, 8], freq=30,
-                        num_levels=16, level_dim=2, base_resolution=16, log2_hashmap_size=13, desired_resolution=H)
+    model_coarse = CuNeRF(D=6, W=512, W_last=256, input_ch=3, output_ch=2, skips=[2, 4], freq=40, 
+                         num_levels=16, level_dim=2, base_resolution=16, log2_hashmap_size=14, desired_resolution=H) 
 
-    grad_vars = list(model_coarse.parameters()) + list(model_fine.parameters())
+    grad_vars = list(model_coarse.parameters())
     print("Number of parameters: ", sum(p.numel() for p in grad_vars if p.requires_grad))
     optimizer = torch.optim.Adam(params=grad_vars, lr=args.lrate, betas=(0.9, 0.999))
+
+    optimizer = torch.optim.Adam([
+            {'name': 'encoding', 'params': model.encoder.parameters()},
+            {'name': 'net', 'params': model.backbone.parameters(), 'weight_decay': 1e-6},
+        ], lr=opt.lr, betas=(0.9, 0.99), eps=1e-15)
 
     # Create log dir and copy the config file
     basedir = args.basedir
@@ -357,9 +366,9 @@ def cuNeRF_train():
         with open(f, 'w') as file:
             file.write(open(args.config, 'r').read())
 
-    start, optimizer, model_coarse, model_fine = load_checkpoint(args, basedir, expname, optimizer, model_coarse, model_fine)
+    start, optimizer, model_coarse = load_checkpoint(args, basedir, expname, optimizer, model_coarse)
 
-    length = torch.tensor([0.15, 0.15, 0.1])
+    length = torch.tensor([0.08, 0.08, 0.1])
 
     global_step = start
 
@@ -370,7 +379,7 @@ def cuNeRF_train():
             os.makedirs(testsavedir, exist_ok=True)
 
             batch_size = 10000
-            render_view(model_coarse, model_fine, 16, 16, length, H, W, [0, 0, 0], [0, 0, 0], batch_size, testsavedir)
+            render_view(model_coarse, 16, 16, length, H, W, [0, 0, 0], [0, 0, 0], batch_size, testsavedir)
 
             return
 
@@ -379,7 +388,7 @@ def cuNeRF_train():
     use_batching = not args.no_batching
 
     # Create dataset and dataloader for train and validation set
-    num_samples = 20000
+    num_samples = 30000
     train_dataset = MicroCTVolume(colors, coords, H, W)
     train_loader = DataLoader(train_dataset, batch_size=num_samples, shuffle=True, generator=torch.Generator(device='cuda'))
 
@@ -390,7 +399,7 @@ def cuNeRF_train():
     print('Begin')
 
     model_coarse.train()
-    model_fine.train()
+    # model_fine.train()
     scaler = torch.cuda.amp.GradScaler(enabled=args.fp16)
 
     global_step = 0
@@ -408,10 +417,9 @@ def cuNeRF_train():
                 
                 colors = batch[0].to(device)
                 coords = batch[1].to(device)
-
                 
                 with torch.cuda.amp.autocast(enabled=args.fp16):
-                    preds, truths, loss, preds_coarse  = train_step(model_coarse, model_fine, colors, coords, length, 64, 192)
+                    preds, truths, loss  = train_step(model_coarse, colors, coords, length, 64)
                         
                     # optimizer.zero_grad()
                     # loss.backward()
@@ -420,7 +428,6 @@ def cuNeRF_train():
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
-
 
             # NOTE: IMPORTANT!
             ###   update learning rate   ###
@@ -433,7 +440,7 @@ def cuNeRF_train():
             # Evaluate the model
             if global_step % args.eval_step == 0 and args.eval_step > 0:
                 print("Evaluating the model...")
-                evaluate(model_coarse, model_fine, valid_loader, H, W, 16, 16, length, args.fp16, global_step)
+                evaluate(model_coarse, valid_loader, H, W, 128, length / 10.0, args.fp16, global_step, basedir, expname)
                 
             if global_step % args.print_interval == 0:
                 tqdm.write(f"[TRAIN] Step: {global_step} Loss: {loss}")
@@ -446,7 +453,7 @@ def cuNeRF_train():
                     torch.save({
                         'global_step': global_step,
                         'network_fn_state_dict': model_coarse.state_dict(),
-                        'network_fine_state_dict': model_fine.state_dict(),
+                        # 'network_fine_state_dict': model_fine.state_dict(),
                         'optimizer_state_dict': optimizer.state_dict(),
                     }, path)
                     print('Saved checkpoints at', path)
@@ -457,7 +464,7 @@ def cuNeRF_train():
                 torch.save({
                     'global_step': global_step,
                     'network_fn_state_dict': model_coarse.state_dict(),
-                    'network_fine_state_dict': model_fine.state_dict(),
+                    # 'network_fine_state_dict': model_fine.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                 }, path)
                 print('Saved checkpoints at', path)
