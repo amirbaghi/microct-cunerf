@@ -103,9 +103,12 @@ if __name__ == '__main__':
     seed_everything(opt.seed)
     # Add the paramters for the network.
     if opt.rhino:
-        model = INGPNetworkRHINO(num_layers=5, hidden_dim=512, input_dim=3, num_levels=17,
-                        level_dim=2, base_resolution=16, log2_hashmap_size=21, desired_resolution=2088, 
-                        align_corners=False)
+        coarse_model = INGPNetworkRHINO(num_layers=8, hidden_dim=512, input_dim=3, num_levels=17,
+                        level_dim=2, base_resolution=16, log2_hashmap_size=13, desired_resolution=512, 
+                        align_corners=False, freq=20, transformer_num_layers=1, transformer_hidden_dim=64)
+        fine_model = INGPNetworkRHINO(num_layers=8, hidden_dim=512, input_dim=3, num_levels=17,
+                level_dim=2, base_resolution=16, log2_hashmap_size=13, desired_resolution=261, 
+                align_corners=False, freq=20, transformer_num_layers=1, transformer_hidden_dim=64)
     #     model = INGPNetworkRHINO(num_layers=4, hidden_dim=256, input_dim=3, num_levels=16, # num_levels=17
     #                     level_dim=2, base_resolution=8, log2_hashmap_size=22, desired_resolution=1024,  # desired_resolution=2048
     #                     align_corners=False, freq=20, transformer_num_layers=1, transformer_hidden_dim=64)
@@ -127,54 +130,31 @@ if __name__ == '__main__':
     base_img_path = os.path.join(dataset_dir, base_img_name)
 
     if opt.test:
-        trainer = Trainer('ngp', model, workspace=opt.workspace, fp16=opt.fp16, use_checkpoint='best', eval_interval=1)
-        # Evaluate the training
-        # train_dataset = MicroCTVolume(base_img_name=f'{base_img_path}-', resize_factor=1, start_slice_index=start_slice, end_slice_index=end_slice)
-        # H,W = train_dataset.get_H_W()
-        colors, coords, H, W = load_tiff_images(start_slice, end_slice, base_img_name, resize_factor=4)
+        colors, coords, H, W = load_tiff_images(start_slice, end_slice, base_img_name, resize_factor=8)
+        pixel_dist = torch.sqrt(torch.sum((coords[1] - coords[0])**2)).item()
+        trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, ema_decay=0.95, fp16=opt.fp16, use_checkpoint='latest',
+                         eval_interval=1, length=4 * pixel_dist, num_cube_samples=64, num_fine_samples=192)
         H, W = int(H), int(W)
         trainer.test(-1, 1, (end_slice-start_slice+1), H, W, batch_size=1000)
 
     elif opt.test_on_slice:
         trainer = Trainer('ngp', model, workspace=opt.workspace, fp16=opt.fp16, use_checkpoint='best', eval_interval=1)
-        # Evaluate the training
         trainer.test_on_trained_slice(start_slice, end_slice, opt.test_slice, base_img_path, resize_factor=1, imagepath=f'./pred-{opt.test_slice}.png')
 
     elif opt.tune:
-        # Create the study object and optimize the hyperparameters.
         study = optuna.create_study(direction='maximize', study_name='ngp_study', storage='sqlite:////cephyr/users/amirmaso/Alvis/microct-neural-repr/ngp_study.db', load_if_exists=True)
         study.optimize(lambda trial: train_model(trial, start_slice, end_slice, base_img_path, opt.lr, opt.fp16, opt.workspace, opt.rhino), n_trials=50)
-        # Print the best parameters.
         print(study.best_params)
-        # Print the best value.
         print(study.best_value)
-        # Print the best trial.
         print(study.best_trial)
-        
     else:
-        # Separate the dataset into training and validation data. TODO: Change so the train/validation data do not have to be a continuous range.
-        # training_slices = [i for i in range(start_slice, end_slice - 2)]
-        # validation_slices = [i for i in range(end_slice - 3, end_slice + 1)]
-
-        # print(f"Training slices: {training_slices[0], training_slices[-1]}")
-        # print(f"Validation slices: {validation_slices[0], validation_slices[-1]}")
-
         # Create the training data and load it.
         # Load data and create models
-        colors, coords, H, W = load_tiff_images(start_slice, end_slice, base_img_name, resize_factor=4)
+        colors, coords, H, W = load_tiff_images(start_slice, end_slice, base_img_name, resize_factor=8)
         H, W = int(H), int(W)
-        # train_dataset = MicroCTVolume(base_img_name=f'{base_img_path}-', resize_factor=1, start_slice_index=start_slice, end_slice_index=end_slice)
-        
-        # H, W = train_dataset.get_H_W()
-        # random_samples = H*W  # TODO: May have to cap this to the maximum number of samples that can be loaded into GPU memory.
-        # train_loader = DataLoader(train_dataset, batch_size=random_samples, shuffle=True)
-
-        # # Create the validdation data and load it
-        # valid_dataset = MicroCTVolume(base_img_name=f'{base_img_path}-', resize_factor=1, start_slice_index=start_slice, end_slice_index=end_slice)
-        # valid_loader  = DataLoader(valid_dataset, batch_size=random_samples)
         
         # Create dataset and dataloader for train and validation set
-        num_samples = 120000
+        num_samples = 10000
         train_dataset = MicroCTVolume(colors, coords, H, W)
         train_loader = DataLoader(train_dataset, batch_size=num_samples, shuffle=True, generator=torch.Generator(device='cpu'))
 
@@ -187,9 +167,12 @@ if __name__ == '__main__':
         # Load the optimiser (Adam) with the encoding parameters (resulting hashed values when encoding) and the layers themselves.
         if opt.rhino:
             optimizer = lambda model: torch.optim.Adam([
-                {'name': 'encoding', 'params': model.encoder.parameters()},
-                {'name': 'transformer', 'params': model.transformer.parameters(), 'weight_decay': 1e-6},
-                {'name': 'net', 'params': model.backbone.parameters(), 'weight_decay': 1e-6},
+                {'name': 'encoding', 'params': coarse_model.encoder.parameters()},
+                {'name': 'transformer', 'params': coarse_model.transformer.parameters(), 'weight_decay': 1e-6},
+                {'name': 'net', 'params': coarse_model.backbone.parameters(), 'weight_decay': 1e-6},
+                {'name': 'encoding', 'params': fine_model.encoder.parameters()},
+                {'name': 'transformer', 'params': fine_model.transformer.parameters(), 'weight_decay': 1e-6},
+                {'name': 'net', 'params': fine_model.backbone.parameters(), 'weight_decay': 1e-6},
             ], lr=opt.lr, betas=(0.9, 0.99), eps=1e-15)
         else:
             optimizer = lambda model: torch.optim.Adam([
@@ -201,10 +184,14 @@ if __name__ == '__main__':
         scheduler = lambda optimizer: optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
         # Initialize the trainer.
-        trainer = Trainer('ngp', model, workspace=opt.workspace, optimizer=optimizer, criterion=criterion, ema_decay=0.95, fp16=opt.fp16, lr_scheduler=scheduler, use_checkpoint='latest', eval_interval=1)
+        # Get the pixel distance from two neighbouring pixels 
+        pixel_dist = torch.sqrt(torch.sum((coords[1] - coords[0])**2)).item()
+        print(4 * pixel_dist)
+        trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, optimizer=optimizer, criterion=criterion, ema_decay=0.95, fp16=opt.fp16, lr_scheduler=scheduler, use_checkpoint='latest',
+                         eval_interval=1, length=0.15, num_cube_samples=32, num_fine_samples=128)
         
         # Train the network
-        trainer.train(train_loader, valid_loader, 10)
+        trainer.train(train_loader, valid_loader, 5)
 
         # Evaluate the training
         H,W = train_dataset.get_H_W()
