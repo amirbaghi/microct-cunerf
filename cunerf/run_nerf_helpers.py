@@ -49,7 +49,7 @@ class CuNeRF(nn.Module):
         self.freq_range = torch.arange(self.freq, device='cuda')
         self.in_dim = self.input_ch * self.freq * 2
         # self.encoder = GridEncoder(input_dim=input_ch, num_levels=num_levels, level_dim=level_dim, base_resolution=base_resolution, 
-                                    # log2_hashmap_size=log2_hashmap_size, desired_resolution=desired_resolution, gridtype='hash', align_corners=align_corners)
+        #                             log2_hashmap_size=log2_hashmap_size, desired_resolution=desired_resolution, gridtype='hash', align_corners=align_corners)
         # self.in_dim = self.encoder.output_dim
             
         self.linears = nn.ModuleList(
@@ -94,6 +94,8 @@ def adaptive_loss_fn(pixels, preds_coarse, preds_fine):
     L = sum( lambda * || pixels - preds_coarse ||_2 ** 2 + || pixels - preds_fine ||_2 ** 2)
     lambda = || pixels - preds_fine || ** 1/2
     """
+
+    # print("Pixels range: ", pixels.min(), pixels.max())
     loss_fn = torch.nn.MSELoss()
 
     # Remove singleton dimension from pixels
@@ -118,8 +120,15 @@ def adaptive_loss_fn(pixels, preds_coarse, preds_fine):
     # || pixels - preds_fine || ** 1/2
     adapt_reg = torch.sqrt(loss_fine)
 
-    # return adapt_reg * loss_coarse + loss_fine
+    # adapt_reg2 = torch.sqrt(loss_fine)
+
+    # Print number of nans in loss
+    # print("Nans in loss_coarse: ", torch.isnan(loss_coarse).sum())
+    # print("Nans in loss_fine: ", torch.isnan(loss_fine).sum())
+    # print("Nans in adapt_reg: ", torch.isnan(adapt_reg).sum())
+
     return adapt_reg * loss_coarse + loss_fine
+    # return adapt_reg2 * loss_coarse + adapt_reg * loss_fine
     # return loss_coarse + loss_fine
     # return loss_fine
 
@@ -134,9 +143,9 @@ def get_cube_samples(n_samples, centers, length):
     for center in centers:
         center_samples = torch.rand((n_samples, 3)) - 0.5
         center_samples = center_samples * length + center
-        # print("Center: ", center_samples)   
 
         distances = torch.norm(center_samples - center, dim=-1, keepdim=True)
+
         center_samples = torch.cat([center_samples, distances], dim=-1)
         samples.append(center_samples)
     samples = torch.stack(samples, dim=0)
@@ -152,44 +161,27 @@ def calculate_color(samples):
     samples: (n_centers, n_samples, 3): (distance, density, color)
     return: (n_centers, 3)
     """
-
-    # Print the nan values in the samples
-    # print("Samples: ", samples)
-    # print("Samples Nan values: ", torch.isnan(samples).any())
-
     n_centers, n_samples, _ = samples.shape
 
     # Calculate the differences between consecutive distances
     distance_diffs = samples[:, 1:, 0] - samples[:, :-1, 0]
 
+    sphere_surface_area = 4 * np.pi * (samples[:, :-1, 0]**2)
+    densities_distances = samples[:, :-1, 1] * distance_diffs
+
     # Calculate the numerators
-    numerators =  (samples[:, :-1, 0]**2) * (1 - torch.exp(-samples[:, :-1, 1] * distance_diffs))
+    term_1 = sphere_surface_area * (1. - torch.exp(-densities_distances))
 
     # Calculate the denominators
-    denominators = torch.cumsum((samples[:, :-1, 0]**2) * samples[:, :-1, 1] * distance_diffs, dim=1)
-    # print("Max distance diffs: ", torch.max(distance_diffs))
-    # print("Max distances: ", torch.max(samples[:, :-1, 0]))
-    # print("Max densities: ", torch.max(samples[:, :-1, 1]))
-    # print(denominators.shape)
-    denominators = denominators * 4 * np.pi
-    # print("Denominator nans: ", torch.isnan(denominators).any())
-    # print("Denominator max: ", torch.max(denominators))
-    # print(denominators[0])
-    # print
-    # print(denominators[0][-1])
-    denominators = torch.clamp(denominators, max=88)  # 88 is approximately the maximum input to exp() that will not overflow
-# denominators = torch.exp(denominators)
-    denominators = torch.exp(denominators)
-    # print(denominators[0])
-
-    # print("Calculate Color Values -------------------")
-    # print("Numerator nans: ", torch.isnan(numerators).any())
+    term_2 = torch.cumprod(torch.exp(-sphere_surface_area * densities_distances), dim=1)
 
     # Calculate the colors
-    values = numerators / denominators * samples[:, :-1, 2]
-    # print("Values nans: ", torch.isnan(values).any())
+    values = term_1 * term_2 * samples[:, :-1, 2]
     colors = torch.sum(values, dim=1)
-    colors = colors * 4 * np.pi
+    # print("Colors range: ", colors.min(), colors.max())
+
+    # Clamp the colors to [0, 1]
+    # colors = torch.clamp(colors, min=0, max=1)
 
     return colors
 
@@ -212,7 +204,7 @@ def evaluate_point(model, samples, device):
     return color
 
 # Cube-based hierarchical sampling
-def get_cube_samples_hierarchical(n_samples, distances, densities):
+def get_cube_samples_hierarchical(n_samples, centers, distances, densities):
     """
     Generate new coordinates using the new distances
     Using the formula x = (distance * sin(phi) * cos(theta), distance * sin(phi) * sin(theta), distance * cos(phi))
@@ -223,20 +215,17 @@ def get_cube_samples_hierarchical(n_samples, distances, densities):
     densities: (n_centers, n_coarse_samples)
     return: (n_centers, n_samples, 4) => (x, y, z, distance)
     """
-
     n_centers = distances.shape[0]
 
     # Get new distances using ITS on the distances and densities of the course samples
     new_distances = sample_pdf(distances, densities, n_samples, det=False, pytest=False)
-
-    # print("Max new distances: ", torch.max(new_distances))
 
     thetas = torch.rand((n_centers, n_samples)) * 2 * np.pi
     phis = torch.rand((n_centers, n_samples)) * np.pi
     x = new_distances * torch.sin(phis) * torch.cos(thetas)
     y = new_distances * torch.sin(phis) * torch.sin(thetas)
     z = new_distances * torch.cos(phis)
-    new_samples = torch.stack([x, y, z], dim=-1)
+    new_samples = torch.stack([x, y, z], dim=-1) + centers.unsqueeze(1)
 
     # Add distances to the result tensor for each element
     new_samples = torch.cat([new_samples, new_distances.unsqueeze(-1)], dim=-1)

@@ -131,11 +131,12 @@ if __name__ == '__main__':
 
     if opt.test:
         colors, coords, H, W = load_tiff_images(start_slice, end_slice, base_img_name, resize_factor=8)
-        pixel_dist = torch.sqrt(torch.sum((coords[1] - coords[0])**2)).item()
+        # pixel_dist = 4 * torch.sqrt(torch.sum((coords[1] - coords[0])**2)).item()
+        pixel_dist = 1. / H
         trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, ema_decay=0.95, fp16=opt.fp16, use_checkpoint='latest',
-                         eval_interval=1, length=4 * pixel_dist, num_cube_samples=64, num_fine_samples=192)
+                         eval_interval=1, length=pixel_dist, num_cube_samples=64, num_fine_samples=192)
         H, W = int(H), int(W)
-        trainer.test(-1, 1, (end_slice-start_slice+1), H, W, batch_size=1000)
+        trainer.test(0, 1, 2 * (end_slice-start_slice+1), H, W, batch_size=1000)
 
     elif opt.test_on_slice:
         trainer = Trainer('ngp', model, workspace=opt.workspace, fp16=opt.fp16, use_checkpoint='best', eval_interval=1)
@@ -147,10 +148,12 @@ if __name__ == '__main__':
         print(study.best_params)
         print(study.best_value)
         print(study.best_trial)
+        
     else:
         # Create the training data and load it.
         # Load data and create models
         colors, coords, H, W = load_tiff_images(start_slice, end_slice, base_img_name, resize_factor=8)
+
         H, W = int(H), int(W)
         
         # Create dataset and dataloader for train and validation set
@@ -184,15 +187,16 @@ if __name__ == '__main__':
         scheduler = lambda optimizer: optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
         # Initialize the trainer.
-        # Get the pixel distance from two neighbouring pixels 
-        pixel_dist = torch.sqrt(torch.sum((coords[1] - coords[0])**2)).item()
-        print(4 * pixel_dist)
+        pixel_distance = torch.tensor([0.001, 0.001, 1. / (end_slice-start_slice+1)], device='cuda')
+        # Get the pixel distance between two pixels in the image.
+        pd = torch.sqrt(torch.sum((coords[1] - coords[0])**2)).item()
+        print(1. / H, pd)
         trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, optimizer=optimizer, criterion=criterion, ema_decay=0.95, fp16=opt.fp16, lr_scheduler=scheduler, use_checkpoint='latest',
-                         eval_interval=1, length=0.15, num_cube_samples=32, num_fine_samples=128)
+                         eval_interval=1, length=pixel_distance, num_cube_samples=64, num_fine_samples=192)
         
         # Train the network
-        trainer.train(train_loader, valid_loader, 5)
+        trainer.train(train_loader, valid_loader, 15)
 
         # Evaluate the training
         H,W = train_dataset.get_H_W()
-        trainer.test(-1, 1, (end_slice-start_slice+1), H, W, batch_size=1000)
+        trainer.test(0, 1, (end_slice-start_slice+1), H, W, batch_size=1000)

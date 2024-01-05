@@ -112,29 +112,3 @@ def load_tiff_images(start_index, end_index, base_img_name, resize_factor=1):
     return colors, coords, H, W
 
 
-# if __name__ == "__main__":
-#     img = np.zeros((3, 3, 3))
-
-#     for i in range(3):
-#         img[i] = np.arange(i*9+1, i*9+10).reshape(3, 3)
-
-#     # Save the images
-#     for i in range(3):
-#         tiff.imwrite(f'test{i}.tif', img[i])
-
-#     # Load the images using load_tiff_images
-#     slices, coords, H, W = load_tiff_images(0, 2, 'test')
-
-#     # Print the loaded images
-#     slices = slices.reshape(-1, 1)
-#     coords = coords.reshape(-1, 3)
-#     pixels = torch.tensor([[coords[0], coords[1], coords[2], color] for coords, color in zip(coords, slices)])
-
-#     print("Generating new slices for the given view. should give the middle slice coords")
-#     new_coords = get_view_mgrid(H, W, [0, 0, 0], [0, 0, 0])
-
-#     print(new_coords)
-
-
-
-

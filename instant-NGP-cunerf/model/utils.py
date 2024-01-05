@@ -69,6 +69,7 @@ def normalize(coordinates, x_dim, y_dim, z_dim):
     x_norm = 2*(x-(x_dim/2)) / x_dim
     y_norm = 2*(y-(y_dim/2)) / y_dim
     z_norm = 2*(z-(z_dim/2)) / z_dim
+    # 2 * (-1 - (1 / 2)) / 1
 
     norm_coordinates = torch.stack([x_norm, y_norm, z_norm], dim=1)
     return norm_coordinates
@@ -131,7 +132,7 @@ class Trainer(object):
                  report_metric_at_train=False, # also report metrics at training
                  use_checkpoint="latest", # which ckpt to use at init time
                  scheduler_update_every_step=False, # whether to call scheduler.step() after every train step
-                 length=1,
+                 length=torch.tensor([1.0, 1.0, 1.0]),
                  num_cube_samples=64,
                  num_fine_samples=192
                  ):
@@ -237,7 +238,6 @@ class Trainer(object):
         if self.log_ptr: 
             self.log_ptr.close()
 
-    # TODO: May need to be modified
     def test(self, start, end, step, H, W, batch_size=100, base_image_path='pred'):
         self.log("[INFO] Generating test images ...")
         z_coords = torch.linspace(start, end, steps=step)
@@ -314,7 +314,7 @@ class Trainer(object):
             coord_batch = coord_batch.to(device)
             
             # Get the coordinates and distances of the coarse samples for each center
-            cube_samples = self.get_cube_samples(8, coord_batch, torch.tensor([self.length, self.length, self.length], device=self.device))
+            cube_samples = self.get_cube_samples(32, coord_batch, self.length)
             coords = cube_samples[:, :, :3]
             distances = cube_samples[:, :, 3]
 
@@ -328,12 +328,15 @@ class Trainer(object):
             colors_c = torch.reshape(colors_flat, list(coords.shape[:-1]))
             densities_c = torch.reshape(densities_flat, list(coords.shape[:-1]))
 
+            # Normalize the distances
+            normalized_dists = distances / self.length.max()
+
             # Evaluate the coarse color for each center pixel
-            course_colors = self.calculate_color(torch.cat((distances.unsqueeze(2), 
+            course_colors = self.calculate_color(torch.cat((normalized_dists.unsqueeze(2), 
                                                     densities_c.unsqueeze(2), colors_c.unsqueeze(2)), dim=2))
 
             # Get fine samples for each center pixel
-            fine_samples = self.get_cube_samples_hierarchical(8, distances, densities_c)
+            fine_samples = self.get_cube_samples_hierarchical(32, coord_batch, distances, densities_c)
 
             # Predict the color and density of the fine samples
             fine_coords = torch.cat((coords, fine_samples[:, :,:3]), dim=1)
@@ -352,17 +355,15 @@ class Trainer(object):
             densities_f = densities_f.gather(1, inds)
             colors_f = colors_f.gather(1, inds)
 
+            # Normalize the distances
+            normalized_dists_f = distances_f / self.length.max()
+
             # Evaluate the fine color for each center pixel
-            pred_colors = self.calculate_color(torch.cat((distances_f.unsqueeze(2), 
+            pred_colors = self.calculate_color(torch.cat((normalized_dists_f.unsqueeze(2), 
                                                 densities_f.unsqueeze(2), colors_f.unsqueeze(2)), dim=2))
 
             img_pred[i:i+len(coord_batch)] = pred_colors.cpu().detach()
             i = i + len(coord_batch)
-
-        # Calculate the loss
-    #     mse = torch.nn.MSELoss()
-    #     mse = mse(img_pred, img).item()
-    #     psnr = 20 * log10(img.max() / sqrt(mse))
 
         # Show predicted image
         model_img = img_pred.view(height,width).numpy()
@@ -376,8 +377,6 @@ class Trainer(object):
         # Save prediction image
         plt.imsave(imagepath, model_img, cmap="gray")
 
-    #     print(f'The resulting MSE: {mse:.6f} and PSNR: {psnr}')
-
         return img_pred
 
 
@@ -390,7 +389,7 @@ class Trainer(object):
             self.log_ptr.flush() # write immediately to file
 
     # Cube-based hierarchical sampling
-    def get_cube_samples_hierarchical(self, n_samples, distances, densities):
+    def get_cube_samples_hierarchical(self, n_samples, centers, distances, densities):
         """
         Generate new coordinates using the new distances
         Using the formula x = (distance * sin(phi) * cos(theta), distance * sin(phi) * sin(theta), distance * cos(phi))
@@ -401,20 +400,17 @@ class Trainer(object):
         densities: (n_centers, n_coarse_samples)
         return: (n_centers, n_samples, 4) => (x, y, z, distance)
         """
-
         n_centers = distances.shape[0]
 
         # Get new distances using ITS on the distances and densities of the course samples
         new_distances = self.sample_pdf(distances, densities, n_samples, det=False, pytest=False)
 
-        # print("Max new distances: ", torch.max(new_distances))
-
-        thetas = torch.rand((n_centers, n_samples), device=new_distances.device) * 2 * np.pi
-        phis = torch.rand((n_centers, n_samples), device=new_distances.device) * np.pi
+        thetas = torch.rand((n_centers, n_samples), device=self.device) * 2 * np.pi
+        phis = torch.rand((n_centers, n_samples), device=self.device) * np.pi
         x = new_distances * torch.sin(phis) * torch.cos(thetas)
         y = new_distances * torch.sin(phis) * torch.sin(thetas)
         z = new_distances * torch.cos(phis)
-        new_samples = torch.stack([x, y, z], dim=-1)
+        new_samples = torch.stack([x, y, z], dim=-1) + centers.unsqueeze(1)
 
         # Add distances to the result tensor for each element
         new_samples = torch.cat([new_samples, new_distances.unsqueeze(-1)], dim=-1)
@@ -507,7 +503,7 @@ class Trainer(object):
 
     ### ------------------------------	
     # color, cube_samples
-    def train_step(self, label, input):
+    def train_step(self, label, input, centers):
         X = input
         y = label
         
@@ -524,12 +520,15 @@ class Trainer(object):
         colors_c = torch.reshape(colors_flat, list(coords.shape[:-1]))
         densities_c = torch.reshape(densities_flat, list(coords.shape[:-1]))
 
+        # Normalize the distances
+        normalized_dists = distances / self.length.max()
+
         # Evaluate the coarse color for each center pixel
-        coarse_colors = self.calculate_color(torch.cat((distances.unsqueeze(2), 
+        coarse_colors = self.calculate_color(torch.cat((normalized_dists.unsqueeze(2), 
                                                 densities_c.unsqueeze(2), colors_c.unsqueeze(2)), dim=2))
 
         # Get fine samples for each center pixel
-        fine_samples = self.get_cube_samples_hierarchical(self.num_fine_samples, distances, densities_c)
+        fine_samples = self.get_cube_samples_hierarchical(self.num_fine_samples, centers, distances, densities_c)
 
         # Predict the color and density of the fine samples
         fine_coords = torch.cat((coords, fine_samples[:, :,:3]), dim=1)
@@ -548,8 +547,11 @@ class Trainer(object):
         densities_f = densities_f.gather(1, inds)
         colors_f = colors_f.gather(1, inds)
 
+        # Normalize the distances
+        normalized_dists_f = distances_f / self.length.max()
+
         # Evaluate the fine color for each center pixel
-        fine_colors = self.calculate_color(torch.cat((distances_f.unsqueeze(2), 
+        fine_colors = self.calculate_color(torch.cat((normalized_dists_f.unsqueeze(2), 
                                             densities_f.unsqueeze(2), colors_f.unsqueeze(2)), dim=2))
 
         # loss = self.criterion(pred_color, y.squeeze())
@@ -557,8 +559,8 @@ class Trainer(object):
 
         return fine_colors, y, loss
 
-    def eval_step(self, label, input):
-        return self.train_step(label, input)
+    def eval_step(self, label, input, centers):
+        return self.train_step(label, input, centers)
 
     ### ------------------------------
     
@@ -575,6 +577,11 @@ class Trainer(object):
 
             if self.epoch % self.eval_interval == 0:
                 self.evaluate_one_epoch(valid_loader)
+                
+                z_coords = torch.linspace(0, 1, steps=(11399 - 11390 + 1))
+                coords = get_slice_mgrid(261, 261, float(z_coords[0]))
+                self.test_image_partial(261, 261, coords, self.device, batch_size=1000, imagepath=f'{z_coords[0]:.2f}.png')
+
                 self.save_checkpoint(full=False, best=True)
 
     def evaluate(self, loader):
@@ -604,12 +611,12 @@ class Trainer(object):
             input_coords = data[1].to(self.device)
 
             # cube sampling.
-            cube_samples = self.get_cube_samples(self.num_cube_samples, input_coords, torch.tensor([self.length, self.length, self.length], device=self.device))
+            cube_samples = self.get_cube_samples(self.num_cube_samples, input_coords, self.length)
 
             self.optimizer.zero_grad()
 
             with torch.cuda.amp.autocast(enabled=self.fp16):
-                preds, truths, loss = self.train_step(colors, cube_samples)
+                preds, truths, loss = self.train_step(colors, cube_samples, input_coords)
             self.scaler.scale(loss).backward()
             self.scaler.step(self.optimizer)
             self.scaler.update()
@@ -675,9 +682,9 @@ class Trainer(object):
                     self.ema.copy_to()
 
                 # cube sampling.
-                cube_samples = self.get_cube_samples(self.num_cube_samples, input_coords, torch.tensor([self.length, self.length, self.length], device=self.device))
+                cube_samples = self.get_cube_samples(self.num_cube_samples, input_coords, self.length)
                 with torch.cuda.amp.autocast(enabled=self.fp16):
-                    preds, truths, loss = self.eval_step(colors, cube_samples)
+                    preds, truths, loss = self.eval_step(colors, cube_samples, input_coords)
 
                 if self.ema is not None:
                     self.ema.restore()
@@ -709,23 +716,28 @@ class Trainer(object):
 
     # Isotropic volumetric sampling
     def calculate_color(self, samples):
+
         n_centers, n_samples, _ = samples.shape
 
         # Calculate the differences between consecutive distances
         distance_diffs = samples[:, 1:, 0] - samples[:, :-1, 0]
 
+        sphere_surface_area = 4 * np.pi * (samples[:, :-1, 0]**2)
+        densities_distances = samples[:, :-1, 1] * distance_diffs
+
         # Calculate the numerators
-        numerators =  (samples[:, :-1, 0]**2) * (1 - torch.exp(-samples[:, :-1, 1] * distance_diffs))
+        term_1 = sphere_surface_area * (1. - torch.exp(-densities_distances))
 
         # Calculate the denominators
-        denominators = torch.cumsum((samples[:, :-1, 0]**2) * samples[:, :-1, 1] * distance_diffs, dim=1)
-        denominators = denominators * 4 * np.pi
-        denominators = torch.exp(denominators)
+        term_2 = torch.cumprod(torch.exp(-sphere_surface_area * densities_distances), dim=1)
 
         # Calculate the colors
-        values = numerators / denominators * samples[:, :-1, 2]
+        values = term_1 * term_2 * samples[:, :-1, 2]
         colors = torch.sum(values, dim=1)
-        colors = colors * 4 * np.pi
+        # print("Colors range: ", colors.min(), colors.max())
+
+        # Clamp the colors to [0, 1]
+        # colors = torch.clamp(colors, min=0, max=1)
 
         return colors
 

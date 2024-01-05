@@ -7,6 +7,7 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import StepLR
 from skimage.metrics import structural_similarity
 
 
@@ -124,9 +125,9 @@ def config_parser():
                         help='channels per layer')
     parser.add_argument("--N_rand", type=int, default=32*32*4, 
                         help='batch size (number of random rays per gradient step)')
-    parser.add_argument("--lrate", type=float, default=5e-3, 
+    parser.add_argument("--lrate", type=float, default=2e-3, 
                         help='learning rate')
-    parser.add_argument("--lrate_decay", type=int, default=250, 
+    parser.add_argument("--lrate_decay", type=int, default=0.1, 
                         help='exponential learning rate decay (in 1000 steps)')
     parser.add_argument("--chunk", type=int, default=1024*32, 
                         help='number of rays processed in parallel, decrease if running out of memory')
@@ -178,7 +179,7 @@ def evaluate_step(model_coarse, model_fine, loader, H, W, n_samples_c, n_samples
         densities_c = torch.reshape(densities_flat_c, list(coords.shape[:-1]))
 
         # Get fine samples for each center pixel
-        fine_samples = get_cube_samples_hierarchical(n_samples_f, distances, densities_c)
+        fine_samples = get_cube_samples_hierarchical(n_samples_f, X, distances, densities_c)
 
         # Predict the color and density of the fine samples
         fine_coords = torch.cat((coords, fine_samples[:, :,:3]), dim=1)
@@ -197,8 +198,11 @@ def evaluate_step(model_coarse, model_fine, loader, H, W, n_samples_c, n_samples
         densities_f = densities_f.gather(1, inds)
         colors_f = colors_f.gather(1, inds)
 
+        # Normalize the distances by the length of the cube
+        normalized_distances = distances_f / length
+
         # Evaluate the fine color for each center pixel
-        fine_center_color = calculate_color(torch.cat((distances_f.unsqueeze(2), 
+        fine_center_color = calculate_color(torch.cat((normalized_distances.unsqueeze(2), 
                                             densities_f.unsqueeze(2), colors_f.unsqueeze(2)), dim=2))
 
         # loss = torch.nn.MSELoss()(y.squeeze(1), fine_center_color)
@@ -256,11 +260,21 @@ def train_step(model_coarse, model_fine, label, input, length, n_samples_c, n_sa
     densities_c = torch.reshape(densities_flat_c, list(coords.shape[:-1]))
 
     # Evaluate the coarse color for each center pixel
-    coarse_center_color = calculate_color(torch.cat((distances.unsqueeze(2), 
+    # Print the max value of densities_c
+    # print("Coarse model")
+    # print("Max density: ", torch.max(densities_c), "Min density: ", torch.min(densities_c))
+    # print("Max color: ", torch.max(colors_c), "Min color: ", torch.min(colors_c))
+
+    # Normalize the distances by the length of the cube
+    normalized_distances = distances / length
+
+    # print("Norm dists range: ", normalized_distances.max(), normalized_distances.min())
+
+    coarse_center_color = calculate_color(torch.cat((normalized_distances.unsqueeze(2), 
                                           densities_c.unsqueeze(2), colors_c.unsqueeze(2)), dim=2))
 
     # Get fine samples for each center pixel
-    fine_samples = get_cube_samples_hierarchical(n_samples_f, distances, densities_c)
+    fine_samples = get_cube_samples_hierarchical(n_samples_f, X, distances, densities_c)
 
     # Predict the color and density of the fine samples
     fine_coords = torch.cat((coords, fine_samples[:, :,:3]), dim=1)
@@ -279,10 +293,18 @@ def train_step(model_coarse, model_fine, label, input, length, n_samples_c, n_sa
     densities_f = densities_f.gather(1, inds)
     colors_f = colors_f.gather(1, inds)
 
-    # Evaluate the fine color for each center pixel
-    fine_center_color = calculate_color(torch.cat((distances_f.unsqueeze(2), 
-                                        densities_f.unsqueeze(2), colors_f.unsqueeze(2)), dim=2))
+    # print("Fine model")
+    # print("Max density: ", torch.max(densities_f), "Min density: ", torch.min(densities_f))
+    # print("Max color: ", torch.max(colors_f), "Min color: ", torch.min(colors_f))
 
+    # Normalize the distances by the length of the cube
+    normalized_distances = distances_f / length
+
+    # print("Norm fine dists range: ", normalized_distances.max(), normalized_distances.min())
+
+    # Evaluate the fine color for each center pixel
+    fine_center_color = calculate_color(torch.cat((normalized_distances.unsqueeze(2), 
+                                        densities_f.unsqueeze(2), colors_f.unsqueeze(2)), dim=2))
 
     loss = adaptive_loss_fn(y, coarse_center_color, fine_center_color)
 
@@ -312,6 +334,8 @@ def load_checkpoint(args, basedir, expname, optimizer, model_coarse, model_fine)
 
         start = ckpt['global_step']
         optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+        if 'lr_scheduler_state_dict' in ckpt:
+            lr_scheduler.load_state_dict(ckpt['lr_scheduler_state_dict'])
 
         # Load model
         model_coarse.load_state_dict(ckpt['network_fn_state_dict'])
@@ -328,17 +352,22 @@ def cuNeRF_train():
     end_index = args.end_index
 
     # Load data and create models
-    colors, coords, H, W = load_tiff_images(start_index, end_index, base_img_name, resize_factor=10)
+    colors, coords, H, W = load_tiff_images(start_index, end_index, base_img_name, resize_factor=8)
     H, W = int(H), int(W)
 
     model_coarse = CuNeRF(D=10, W=256, W_last=128, input_ch=3, output_ch=2, skips=[4, 8], freq=30, 
                          num_levels=16, level_dim=2, base_resolution=16, log2_hashmap_size=13, desired_resolution=H) 
     model_fine = CuNeRF(D=10, W=256, W_last=128, input_ch=3, output_ch=2, skips=[4, 8], freq=30,
-                        num_levels=16, level_dim=2, base_resolution=16, log2_hashmap_size=13, desired_resolution=H)
+                        num_levels=16, level_dim=2, base_resolution=16, log2_hashmap_size=14, desired_resolution=H)
 
     grad_vars = list(model_coarse.parameters()) + list(model_fine.parameters())
     print("Number of parameters: ", sum(p.numel() for p in grad_vars if p.requires_grad))
-    optimizer = torch.optim.Adam(params=grad_vars, lr=args.lrate, betas=(0.9, 0.999))
+    optimizer = torch.optim.Adam(params=[
+        {'name': 'encoding', 'params': model_coarse.parameters(), 'weight_decay': 1e-6},
+        {'name': 'encoding', 'params': model_fine.parameters(), 'weight_decay': 1e-6},
+    ], lr=args.lrate, betas=(0.9, 0.999), eps=1e-15)
+
+    lr_scheduler = StepLR(optimizer, step_size=10, gamma=0.1)
 
     # Create log dir and copy the config file
     basedir = args.basedir
@@ -359,7 +388,10 @@ def cuNeRF_train():
 
     start, optimizer, model_coarse, model_fine = load_checkpoint(args, basedir, expname, optimizer, model_coarse, model_fine)
 
-    length = torch.tensor([0.15, 0.15, 0.1])
+    # Get the distance between two neighboring pixels
+    pixel_distance = 1. / H
+    # length = torch.tensor([pixel_distance, pixel_distance, pixel_distance])
+    length = pixel_distance
 
     global_step = start
 
@@ -379,14 +411,14 @@ def cuNeRF_train():
     use_batching = not args.no_batching
 
     # Create dataset and dataloader for train and validation set
-    num_samples = 20000
+    num_samples = 5000
     train_dataset = MicroCTVolume(colors, coords, H, W)
     train_loader = DataLoader(train_dataset, batch_size=num_samples, shuffle=True, generator=torch.Generator(device='cuda'))
 
     valid_dataset = MicroCTVolume(colors[0], coords.view(colors.shape[0], H, W, 3)[0].view(-1, 3), H, W)
-    valid_loader  = DataLoader(valid_dataset, batch_size=10000, generator=torch.Generator(device='cuda'))
+    valid_loader  = DataLoader(valid_dataset, batch_size=5000, generator=torch.Generator(device='cuda'))
 
-    N_epocs = 60
+    N_epocs = 10
     print('Begin')
 
     model_coarse.train()
@@ -404,31 +436,26 @@ def cuNeRF_train():
         
         for batch in train_loader:
 
-            for _ in range(args.batch_steps):
-                
-                colors = batch[0].to(device)
-                coords = batch[1].to(device)
+            colors = batch[0].to(device)
+            coords = batch[1].to(device)
 
-                
-                with torch.cuda.amp.autocast(enabled=args.fp16):
-                    preds, truths, loss, preds_coarse  = train_step(model_coarse, model_fine, colors, coords, length, 64, 192)
-                        
-                    # optimizer.zero_grad()
-                    # loss.backward()
-                    # optimizer.step()
-
-                scaler.scale(loss).backward()
-                scaler.step(optimizer)
-                scaler.update()
-
+            
+            with torch.cuda.amp.autocast(enabled=args.fp16):
+                preds, truths, loss, preds_coarse  = train_step(model_coarse, model_fine, colors, coords, length, 64, 192)
+                    
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
 
             # NOTE: IMPORTANT!
             ###   update learning rate   ###
-            decay_rate = 0.1
-            decay_steps = args.lrate_decay * 1000
-            new_lrate = args.lrate * (decay_rate ** (global_step / decay_steps))
-            for param_group in optimizer.param_groups:
-                param_group['lr'] = new_lrate
+            
+
+            # decay_rate = 0.1
+            # decay_steps = args.lrate_decay * 1000
+            # new_lrate = args.lrate * (decay_rate ** (global_step / decay_steps))
+            # for param_group in optimizer.param_groups:
+            #     param_group['lr'] = new_lrate
 
             # Evaluate the model
             if global_step % args.eval_step == 0 and args.eval_step > 0:
@@ -448,6 +475,7 @@ def cuNeRF_train():
                         'network_fn_state_dict': model_coarse.state_dict(),
                         'network_fine_state_dict': model_fine.state_dict(),
                         'optimizer_state_dict': optimizer.state_dict(),
+                        'lr_scheduler_state_dict': lr_scheduler.state_dict(), 
                     }, path)
                     print('Saved checkpoints at', path)
 
@@ -462,14 +490,13 @@ def cuNeRF_train():
                 }, path)
                 print('Saved checkpoints at', path)
 
-            # # Decay the length of the cube after a few steps to focus on the fine details
-            # if global_step % 100 == 0 and global_step > 0:
-            #     length = length * 0.9
-            #     length = max(length, torch.tensor([0.1, 0.1, 0.1]).to(device)
-            #     print("Current length of cube: ", length)
 
             global_step += 1
             local_step += 1
+
+        lr_scheduler.step()
+        print("Lr Schduler's learning rate: ", lr_scheduler.get_last_lr())
+        print("Current learning rate: ", optimizer.param_groups[0]['lr'])
 
 if __name__=='__main__':
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
