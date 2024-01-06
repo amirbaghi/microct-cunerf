@@ -25,6 +25,7 @@ import packaging
 from torchvision.transforms.functional import InterpolationMode
 from torchvision.transforms import Compose, ToTensor, Normalize, Resize
 import tifffile as tiff
+import os
 
 def find_directory(dir_name):
     current_dir = os.getcwd()
@@ -119,7 +120,6 @@ class Trainer(object):
                  name, # name of this experiment
                  coarse_model,
                  fine_model,
-                 criterion=None, # loss function, if None, assume inline implementation in train_step
                  optimizer=None, # optimizer
                  ema_decay=None, # if use EMA, set the decay
                  lr_scheduler=None, # scheduler
@@ -169,16 +169,9 @@ class Trainer(object):
         self.coarse_model = coarse_model
         self.fine_model = fine_model        
 
-        if isinstance(criterion, nn.Module):
-            criterion.to(self.device)
-        self.criterion = criterion
-
         if optimizer is None:
-            # self.optimizer = optim.Adam(self.model.parameters(), lr=0.001, weight_decay=5e-4) # naive adam
-            # Optimizer with both the coarse and fine model parameters
             self.optimizer = optim.Adam(list(self.coarse_model.parameters()) + list(self.fine_model.parameters()), lr=0.001, weight_decay=5e-4)
         else:
-            # self.optimizer = optimizer(self.model)
             self.optimizer = optimizer(list(self.coarse_model.parameters()) + list(self.fine_model.parameters()))
 
         if lr_scheduler is None:
@@ -187,7 +180,6 @@ class Trainer(object):
             self.lr_scheduler = lr_scheduler(self.optimizer)
 
         if ema_decay is not None:
-            # self.ema = ExponentialMovingAverage(self.model.parameters(), decay=ema_decay)
             self.ema = ExponentialMovingAverage(list(self.coarse_model.parameters()) + list(self.fine_model.parameters()), decay=ema_decay)
         else:
             self.ema = None
@@ -213,7 +205,9 @@ class Trainer(object):
         # workspace prepare
         self.log_ptr = None
         if self.workspace is not None:
-            os.makedirs(self.workspace, exist_ok=True)        
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            self.workspace = os.path.join(script_dir, self.workspace)
+            os.makedirs(self.workspace, exist_ok=True)
             self.log_path = os.path.join(workspace, f"log_{self.name}.txt")
             self.log_ptr = open(self.log_path, "a+")
 
@@ -307,7 +301,6 @@ class Trainer(object):
 
         return psnr
 
-
     def test_image_partial(self, height, width, coords, device, batch_size=100, imagepath='pred.png'):
 
         coord_batches = np.array_split(coords, (coords.shape[0] / batch_size))
@@ -381,10 +374,8 @@ class Trainer(object):
 
         return img_pred
 
-
     def log(self, *args, **kwargs):
         if not self.mute: 
-            #print(*args)
             self.console.print(*args, **kwargs)
         if self.log_ptr: 
             print(*args, file=self.log_ptr)
@@ -496,15 +487,8 @@ class Trainer(object):
         # Adaptive Regularization Term 
         adapt_reg = torch.sqrt(loss_fine)
 
-        # Print sample fine predictions and their corresponding pixels
-        # print("Fine predictions: ", preds_fine[:10])
-        # print("Coarse predictions: ", preds_coarse[:10])
-        # print("Pixels: ", pixels[:10])
-
         return adapt_reg * loss_coarse + loss_fine
 
-    ### ------------------------------	
-    # color, cube_samples
     def train_step(self, label, input, centers):
         X = input
         y = label
@@ -556,7 +540,6 @@ class Trainer(object):
         fine_colors = self.calculate_color(torch.cat((normalized_dists_f.unsqueeze(2), 
                                             densities_f.unsqueeze(2), colors_f.unsqueeze(2)), dim=2))
 
-        # loss = self.criterion(pred_color, y.squeeze())
         loss = self.adaptive_loss_fn(y.squeeze(), coarse_colors, fine_colors)
 
         return fine_colors, y, loss
@@ -564,14 +547,11 @@ class Trainer(object):
     def eval_step(self, label, input, centers):
         return self.train_step(label, input, centers)
 
-    ### ------------------------------
-    
     def train(self, train_loader, valid_loader, max_epochs, H, W):
 
         for epoch in range(self.epoch + 1, max_epochs + 1):
             self.epoch = epoch
 
-            # For future, create lenghty list of X points over all data files for each Epoch.
             self.train_one_epoch(train_loader)
 
             if self.workspace is not None:
@@ -625,7 +605,6 @@ class Trainer(object):
             colors = data[0].to(self.device)
             input_coords = data[1].to(self.device)
 
-            # cube sampling.
             cube_samples = self.get_cube_samples(self.num_cube_samples, input_coords, self.length)
 
             self.optimizer.zero_grad()
@@ -670,7 +649,6 @@ class Trainer(object):
                 self.lr_scheduler.step()
 
         self.log(f"==> Finished Epoch {self.epoch}.")
-
 
     def evaluate_one_epoch(self, loader):
         self.log(f"++> Evaluate at epoch {self.epoch} ...")
@@ -753,6 +731,7 @@ class Trainer(object):
 
     def get_cube_samples(self, n_samples, centers, dimensions):
         samples = []
+
         for center in centers:
             center_samples = torch.rand((n_samples, 3)) - 0.5
             center_samples = center_samples.to(self.device)
@@ -761,9 +740,12 @@ class Trainer(object):
             distances = torch.norm(center_samples - center, dim=-1, keepdim=True)
             center_samples = torch.cat([center_samples, distances], dim=-1)
             samples.append(center_samples)
+
         samples = torch.stack(samples, dim=0)
+
         for i, _ in enumerate(samples):
             samples[i] = samples[i][samples[i][:,3].argsort()]
+
         return samples
 
     def save_checkpoint(self, full=False, best=False):
@@ -782,7 +764,6 @@ class Trainer(object):
         
         if not best:
 
-            # state['model'] = self.model.state_dict()
             state['coarse_model'] = self.coarse_model.state_dict()
             state['fine_model'] = self.fine_model.state_dict()
 
@@ -808,7 +789,6 @@ class Trainer(object):
                         self.ema.store()
                         self.ema.copy_to()
 
-                    # state['model'] = self.model.state_dict()
                     state['coarse_model'] = self.coarse_model.state_dict()
                     state['fine_model'] = self.fine_model.state_dict()
 

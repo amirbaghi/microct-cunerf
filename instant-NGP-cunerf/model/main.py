@@ -2,83 +2,11 @@ import torch
 import argparse
 from torch.utils.data import DataLoader
 import torch.optim as optim
-import optuna
 
 from ngp_network_RHINO import INGPNetworkRHINO
 from ngp_network import INGPNetwork
 from utils import *
 from load_tiff import *
-
-def train_model(trial, start_slice, end_slice, base_img_path, lr, fp16, workspace, rhino):
-    # Suggest values for the hyperparameters
-    num_layers = trial.suggest_int('num_layers', 3, 4)
-    hidden_dim = trial.suggest_categorical('hidden_dim', [128, 256, 512])
-    num_levels = trial.suggest_categorical('num_levels', [2, 4, 8, 16, 32, 64])
-    base_resolution = trial.suggest_categorical('base_resolution', [8, 16, 32])
-    log2_hashmap_size = trial.suggest_categorical('log2_hashmap_size', [19, 20, 21])
-    desired_resolution = trial.suggest_categorical('desired_resolution', [256, 1024, 2048, 2088, 4096])
-    align_corners = trial.suggest_categorical('align_corners', [True, False])
-    freq = trial.suggest_categorical('freq', [10, 20, 40, 50, 70, 80])
-    transformer_neurons = trial.suggest_categorical('transformer_neurons', [32, 64, 128, 256, 512])
-    transformer_layers = trial.suggest_categorical('transformer_layers', [1])
-    
-    # Add the paramters for the network.
-    if rhino:
-        model = INGPNetworkRHINO(num_layers=num_layers, hidden_dim=hidden_dim, input_dim=3, num_levels=num_levels, 
-                        level_dim=2, base_resolution=base_resolution, log2_hashmap_size=log2_hashmap_size, desired_resolution=desired_resolution, 
-                        align_corners=align_corners, freq=freq, transformer_num_layers=transformer_layers, transformer_hidden_dim=transformer_neurons)
-    else:
-        model = INGPNetwork(num_layers=num_layers, hidden_dim=hidden_dim, input_dim=3, num_levels=num_levels, 
-                        level_dim=2, base_resolution=base_resolution, log2_hashmap_size=log2_hashmap_size, desired_resolution=desired_resolution, 
-                        align_corners=align_corners)
-
-    # Create the training data and load it.
-    train_dataset = MicroCTVolume(base_img_name=f'{base_img_path}-', resize_factor=7, start_slice_index=start_slice, end_slice_index=end_slice)
-
-    H, W = train_dataset.get_H_W()
-    random_samples = H * W  # TODO: May have to cap this to the maximum number of samples that can be loaded into GPU memory.
-    train_loader = DataLoader(train_dataset, batch_size=random_samples, shuffle=True)
-
-    # Create the validdation data and load it
-    valid_dataset = MicroCTVolume(base_img_name=f'{base_img_path}-', resize_factor=7, start_slice_index=start_slice, end_slice_index=end_slice)
-    valid_loader  = DataLoader(valid_dataset, batch_size=random_samples)
-
-    # Use MSELoss as criterion (loss/error function), TODO: Might need change.
-    criterion = torch.nn.MSELoss()
-
-    # Load the optimiser (Adam) with the encoding parameters (resulting hashed values when encoding) and the layers themselves.
-    if rhino:
-        optimizer = lambda model: torch.optim.Adam([
-            {'name': 'encoding', 'params': model.encoder.parameters()},
-            {'name': 'transformer', 'params': model.transformer.parameters(), 'weight_decay': 1e-6},
-            {'name': 'net', 'params': model.backbone.parameters(), 'weight_decay': 1e-6},
-        ], lr=opt.lr, betas=(0.9, 0.99), eps=1e-15)
-    else:
-        optimizer = lambda model: torch.optim.Adam([
-            {'name': 'encoding', 'params': model.encoder.parameters()},
-            {'name': 'net', 'params': model.backbone.parameters(), 'weight_decay': 1e-6},
-        ], lr=opt.lr, betas=(0.9, 0.99), eps=1e-15)
-
-    # Create scheduler to reduce the step size after N many epochs.
-    scheduler = lambda optimizer: optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
-
-    # Initialize the trainer.
-    trainer = Trainer('ngp', model, workspace=workspace, optimizer=optimizer, criterion=criterion, ema_decay=0.95, fp16=fp16, lr_scheduler=scheduler, use_checkpoint='scratch', eval_interval=1)
-
-    # Train the network
-    trainer.train(train_loader, valid_loader, 10)
-
-    # Evaluate the training
-    try:
-        total_psnr = 0
-        for i in range(start_slice, start_slice + 1):
-            psnr = trainer.test_on_trained_slice(start_slice, end_slice, i, base_img_path, imagepath=f'./tmp.png', resize_factor=1, save_img=False)
-            total_psnr += psnr
-
-        return total_psnr
-    except:
-        return 0
-    
 
 if __name__ == '__main__':
 
@@ -99,67 +27,54 @@ if __name__ == '__main__':
 
     opt = parser.parse_args()
     seed_everything(opt.seed)
+
+    start_slice = opt.start_slice
+    end_slice = opt.end_slice
+    base_img_name = opt.base_img_name
+
+    # Load the images
+    colors, coords, H, W = load_tiff_images(start_slice, end_slice, base_img_name, resize_factor=8)
+    H, W = int(H), int(W)
+    cube_lengths = torch.tensor([0.00001, 0.00001, 2. / (end_slice-start_slice+1)], device='cuda')
+
+    # Set the number of samples inside the cube
+    num_coarse_samples = 64
+    num_fine_samples = 192
+
     # Add the paramters for the network.
     if opt.rhino:
         coarse_model = INGPNetworkRHINO(num_layers=8, hidden_dim=512, input_dim=3, num_levels=17,
-                        level_dim=2, base_resolution=16, log2_hashmap_size=13, desired_resolution=2088/8, 
+                        level_dim=2, base_resolution=16, log2_hashmap_size=13, desired_resolution=H/8, 
                         align_corners=False, freq=30, transformer_num_layers=1, transformer_hidden_dim=128)
         fine_model = INGPNetworkRHINO(num_layers=8, hidden_dim=512, input_dim=3, num_levels=17,
-                level_dim=2, base_resolution=16, log2_hashmap_size=15, desired_resolution=2088/8, 
+                level_dim=2, base_resolution=16, log2_hashmap_size=15, desired_resolution=H/8, 
                 align_corners=False, freq=30, transformer_num_layers=1, transformer_hidden_dim=128)
     else:
         model = INGPNetwork(num_layers=5, hidden_dim=512, input_dim=3, num_levels=17, 
                         level_dim=4, base_resolution=16, log2_hashmap_size=21, desired_resolution=261, 
                         align_corners=False)
 
-    start_slice = opt.start_slice
-    end_slice = opt.end_slice
-    base_img_name = opt.base_img_name
-
     dataset_dir = find_directory('dataset')
     if dataset_dir is None:
         print("Dataset directory not found. Please download the dataset as described in README.md.")
-        # Exit the program.
         exit(1)
     
     base_img_path = os.path.join(dataset_dir, base_img_name)
 
     if opt.test:
-        colors, coords, H, W = load_tiff_images(start_slice, end_slice, base_img_name, resize_factor=8)
-        pixel_distance = torch.tensor([0.00001, 0.00001, 2. / (end_slice-start_slice+1)], device='cuda')
         trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, ema_decay=0.95, fp16=opt.fp16, use_checkpoint='latest',
-                         eval_interval=1, length=pixel_distance, num_cube_samples=64, num_fine_samples=192)
+                         eval_interval=1, length=cube_lengths, num_cube_samples=num_coarse_samples, num_fine_samples=num_fine_samples)
         H, W = int(H), int(W)
         trainer.test(0, (end_slice-start_slice+1), 2 * (end_slice-start_slice+1), H, W, batch_size=2000)
 
-    elif opt.test_on_slice:
-        trainer = Trainer('ngp', model, workspace=opt.workspace, fp16=opt.fp16, use_checkpoint='best', eval_interval=1)
-        trainer.test_on_trained_slice(start_slice, end_slice, opt.test_slice, base_img_path, resize_factor=1, imagepath=f'./pred-{opt.test_slice}.png')
-
-    elif opt.tune:
-        study = optuna.create_study(direction='maximize', study_name='ngp_study', storage='sqlite:////cephyr/users/amirmaso/Alvis/microct-neural-repr/ngp_study.db', load_if_exists=True)
-        study.optimize(lambda trial: train_model(trial, start_slice, end_slice, base_img_path, opt.lr, opt.fp16, opt.workspace, opt.rhino), n_trials=50)
-        print(study.best_params)
-        print(study.best_value)
-        print(study.best_trial)
-        
     else:
-        # Create the training data and load it.
-        # Load data and create models
-        colors, coords, H, W = load_tiff_images(start_slice, end_slice, base_img_name, resize_factor=8)
-
-        H, W = int(H), int(W)
-        
         # Create dataset and dataloader for train and validation set
-        num_samples = 2048
+        num_samples = 4000
         train_dataset = MicroCTVolume(colors, coords, H, W)
         train_loader = DataLoader(train_dataset, batch_size=num_samples, shuffle=True, generator=torch.Generator(device='cpu'))
 
         valid_dataset = MicroCTVolume(colors[0], coords.view(colors.shape[0], H, W, 3)[0].view(-1, 3), H, W)
         valid_loader  = DataLoader(valid_dataset, batch_size=10000, generator=torch.Generator(device='cpu'))
-
-        # Use MSELoss as criterion (loss/error function), TODO: Might need change.
-        criterion = torch.nn.MSELoss()
 
         # Load the optimiser (Adam) with the encoding parameters (resulting hashed values when encoding) and the layers themselves.
         if opt.rhino:
@@ -181,9 +96,8 @@ if __name__ == '__main__':
         scheduler = lambda optimizer: optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
         # Initialize the trainer.
-        pixel_distance = torch.tensor([0.00001, 0.00001, 2. / (end_slice-start_slice+1)], device='cuda')
-        trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, optimizer=optimizer, criterion=criterion, ema_decay=0.95, fp16=opt.fp16, lr_scheduler=scheduler, use_checkpoint='latest',
-                         eval_interval=1, length=pixel_distance, num_cube_samples=64, num_fine_samples=192)
+        trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, ema_decay=0.95, fp16=opt.fp16, lr_scheduler=scheduler, use_checkpoint='latest',
+                         eval_interval=1, length=cube_lengths, num_cube_samples=num_coarse_samples, num_fine_samples=num_fine_samples)
         
         # Train the network
         trainer.train(train_loader, valid_loader, 15, H, W)
