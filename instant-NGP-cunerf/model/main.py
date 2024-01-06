@@ -71,12 +71,10 @@ def train_model(trial, start_slice, end_slice, base_img_path, lr, fp16, workspac
     # Evaluate the training
     try:
         total_psnr = 0
-        # for i in range(start_slice, end_slice + 1):
         for i in range(start_slice, start_slice + 1):
             psnr = trainer.test_on_trained_slice(start_slice, end_slice, i, base_img_path, imagepath=f'./tmp.png', resize_factor=1, save_img=False)
             total_psnr += psnr
 
-        # return total_psnr / (end_slice - start_slice + 1)
         return total_psnr
     except:
         return 0
@@ -104,14 +102,11 @@ if __name__ == '__main__':
     # Add the paramters for the network.
     if opt.rhino:
         coarse_model = INGPNetworkRHINO(num_layers=8, hidden_dim=512, input_dim=3, num_levels=17,
-                        level_dim=2, base_resolution=16, log2_hashmap_size=13, desired_resolution=512, 
-                        align_corners=False, freq=20, transformer_num_layers=1, transformer_hidden_dim=64)
+                        level_dim=2, base_resolution=16, log2_hashmap_size=13, desired_resolution=2088/8, 
+                        align_corners=False, freq=30, transformer_num_layers=1, transformer_hidden_dim=128)
         fine_model = INGPNetworkRHINO(num_layers=8, hidden_dim=512, input_dim=3, num_levels=17,
-                level_dim=2, base_resolution=16, log2_hashmap_size=13, desired_resolution=261, 
-                align_corners=False, freq=20, transformer_num_layers=1, transformer_hidden_dim=64)
-    #     model = INGPNetworkRHINO(num_layers=4, hidden_dim=256, input_dim=3, num_levels=16, # num_levels=17
-    #                     level_dim=2, base_resolution=8, log2_hashmap_size=22, desired_resolution=1024,  # desired_resolution=2048
-    #                     align_corners=False, freq=20, transformer_num_layers=1, transformer_hidden_dim=64)
+                level_dim=2, base_resolution=16, log2_hashmap_size=15, desired_resolution=2088/8, 
+                align_corners=False, freq=30, transformer_num_layers=1, transformer_hidden_dim=128)
     else:
         model = INGPNetwork(num_layers=5, hidden_dim=512, input_dim=3, num_levels=17, 
                         level_dim=4, base_resolution=16, log2_hashmap_size=21, desired_resolution=261, 
@@ -131,12 +126,11 @@ if __name__ == '__main__':
 
     if opt.test:
         colors, coords, H, W = load_tiff_images(start_slice, end_slice, base_img_name, resize_factor=8)
-        # pixel_dist = 4 * torch.sqrt(torch.sum((coords[1] - coords[0])**2)).item()
-        pixel_dist = 1. / H
+        pixel_distance = torch.tensor([0.00001, 0.00001, 2. / (end_slice-start_slice+1)], device='cuda')
         trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, ema_decay=0.95, fp16=opt.fp16, use_checkpoint='latest',
-                         eval_interval=1, length=pixel_dist, num_cube_samples=64, num_fine_samples=192)
+                         eval_interval=1, length=pixel_distance, num_cube_samples=64, num_fine_samples=192)
         H, W = int(H), int(W)
-        trainer.test(0, 1, 2 * (end_slice-start_slice+1), H, W, batch_size=1000)
+        trainer.test(0, (end_slice-start_slice+1), 2 * (end_slice-start_slice+1), H, W, batch_size=2000)
 
     elif opt.test_on_slice:
         trainer = Trainer('ngp', model, workspace=opt.workspace, fp16=opt.fp16, use_checkpoint='best', eval_interval=1)
@@ -157,7 +151,7 @@ if __name__ == '__main__':
         H, W = int(H), int(W)
         
         # Create dataset and dataloader for train and validation set
-        num_samples = 10000
+        num_samples = 2048
         train_dataset = MicroCTVolume(colors, coords, H, W)
         train_loader = DataLoader(train_dataset, batch_size=num_samples, shuffle=True, generator=torch.Generator(device='cpu'))
 
@@ -187,16 +181,13 @@ if __name__ == '__main__':
         scheduler = lambda optimizer: optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
         # Initialize the trainer.
-        pixel_distance = torch.tensor([0.001, 0.001, 1. / (end_slice-start_slice+1)], device='cuda')
-        # Get the pixel distance between two pixels in the image.
-        pd = torch.sqrt(torch.sum((coords[1] - coords[0])**2)).item()
-        print(1. / H, pd)
+        pixel_distance = torch.tensor([0.00001, 0.00001, 2. / (end_slice-start_slice+1)], device='cuda')
         trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, optimizer=optimizer, criterion=criterion, ema_decay=0.95, fp16=opt.fp16, lr_scheduler=scheduler, use_checkpoint='latest',
                          eval_interval=1, length=pixel_distance, num_cube_samples=64, num_fine_samples=192)
         
         # Train the network
-        trainer.train(train_loader, valid_loader, 15)
+        trainer.train(train_loader, valid_loader, 15, H, W)
 
         # Evaluate the training
         H,W = train_dataset.get_H_W()
-        trainer.test(0, 1, (end_slice-start_slice+1), H, W, batch_size=1000)
+        trainer.test(0, (end_slice-start_slice+1), (end_slice-start_slice+1), H, W, batch_size=1000)

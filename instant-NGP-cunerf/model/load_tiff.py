@@ -18,7 +18,6 @@ def get_mgrid(x_dim, y_dim, z_dim):
     grid = normalize(grid, x_dim, y_dim, z_dim)
 
     grid = grid[grid[:, 0].argsort()]
-    # indices = np.lexsort((grid[:, 0], grid[:, 1], grid[:, 2]))
     indices = np.lexsort((grid[:, 0].cpu().numpy(), grid[:, 1].cpu().numpy(), grid[:, 2].cpu().numpy()))
     grid = grid[indices]
 
@@ -75,6 +74,10 @@ def normalize(coordinates, x_dim, y_dim, z_dim):
     x = coordinates[:, 0]
     y = coordinates[:, 1]
     z = coordinates[:, 2]
+
+    # x_norm = 2*(x-(x_dim/2)) / (x_dim + 2*padding)
+    # y_norm = 2*(y-(y_dim/2)) / (y_dim + 2*padding)
+    # z_norm = 2*(z-(z_dim/2)) / (z_dim + 2*padding)
 
     x_norm = 2*(x-(x_dim/2)) / x_dim
     y_norm = 2*(y-(y_dim/2)) / y_dim

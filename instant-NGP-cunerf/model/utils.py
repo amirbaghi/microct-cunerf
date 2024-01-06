@@ -86,6 +86,9 @@ def get_slice_mgrid(x_dim, y_dim, z):
     indices = np.lexsort((grid[:, 0].cpu().numpy(), grid[:, 1].cpu().numpy()))
     grid = grid[indices]
 
+    # Replace all of the z coordinates with the given z value
+    grid[:, 2] = z
+
     return grid
 
 class MicroCTVolume(Dataset):
@@ -134,7 +137,9 @@ class Trainer(object):
                  scheduler_update_every_step=False, # whether to call scheduler.step() after every train step
                  length=torch.tensor([1.0, 1.0, 1.0]),
                  num_cube_samples=64,
-                 num_fine_samples=192
+                 num_fine_samples=192,
+                 H = 261,
+                 W = 261
                  ):
         
         self.name = name
@@ -156,6 +161,8 @@ class Trainer(object):
         self.length = length
         self.num_cube_samples = num_cube_samples
         self.num_fine_samples = num_fine_samples
+        self.H = H
+        self.W = W
 
         coarse_model.to(self.device)
         fine_model.to(self.device)
@@ -241,6 +248,7 @@ class Trainer(object):
     def test(self, start, end, step, H, W, batch_size=100, base_image_path='pred'):
         self.log("[INFO] Generating test images ...")
         z_coords = torch.linspace(start, end, steps=step)
+        z_coords = 2*(z_coords-(end/2)) / end
         for z_slice in z_coords:    
             coords = get_slice_mgrid(H, W, float(z_slice))
             self.test_image_partial(H, W, coords, self.device, batch_size=batch_size, imagepath=f'{base_image_path}_{z_slice:.2f}.png')
@@ -314,7 +322,7 @@ class Trainer(object):
             coord_batch = coord_batch.to(device)
             
             # Get the coordinates and distances of the coarse samples for each center
-            cube_samples = self.get_cube_samples(32, coord_batch, self.length)
+            cube_samples = self.get_cube_samples(16, coord_batch, self.length)
             coords = cube_samples[:, :, :3]
             distances = cube_samples[:, :, 3]
 
@@ -336,7 +344,7 @@ class Trainer(object):
                                                     densities_c.unsqueeze(2), colors_c.unsqueeze(2)), dim=2))
 
             # Get fine samples for each center pixel
-            fine_samples = self.get_cube_samples_hierarchical(32, coord_batch, distances, densities_c)
+            fine_samples = self.get_cube_samples_hierarchical(16, coord_batch, distances, densities_c)
 
             # Predict the color and density of the fine samples
             fine_coords = torch.cat((coords, fine_samples[:, :,:3]), dim=1)
@@ -367,12 +375,6 @@ class Trainer(object):
 
         # Show predicted image
         model_img = img_pred.view(height,width).numpy()
-
-        f, ax = plt.subplots(1,1)
-        ax.axis('off')
-        ax.set_title('Neural Representation')
-        ax.imshow(model_img, cmap="gray")
-        f.show()
 
         # Save prediction image
         plt.imsave(imagepath, model_img, cmap="gray")
@@ -485,9 +487,6 @@ class Trainer(object):
         """
         loss_fn = torch.nn.MSELoss()
 
-        # Remove singleton dimension from pixels
-        # pixels = pixels.squeeze(1)
-
         # MSE Loss between pixels and coarse predictions
         loss_coarse = loss_fn(preds_coarse, pixels)
 
@@ -497,7 +496,10 @@ class Trainer(object):
         # Adaptive Regularization Term 
         adapt_reg = torch.sqrt(loss_fine)
 
-        # print(loss_coarse, loss_fine, adapt_reg)
+        # Print sample fine predictions and their corresponding pixels
+        # print("Fine predictions: ", preds_fine[:10])
+        # print("Coarse predictions: ", preds_coarse[:10])
+        # print("Pixels: ", pixels[:10])
 
         return adapt_reg * loss_coarse + loss_fine
 
@@ -564,7 +566,7 @@ class Trainer(object):
 
     ### ------------------------------
     
-    def train(self, train_loader, valid_loader, max_epochs):
+    def train(self, train_loader, valid_loader, max_epochs, H, W):
 
         for epoch in range(self.epoch + 1, max_epochs + 1):
             self.epoch = epoch
@@ -578,9 +580,22 @@ class Trainer(object):
             if self.epoch % self.eval_interval == 0:
                 self.evaluate_one_epoch(valid_loader)
                 
-                z_coords = torch.linspace(0, 1, steps=(11399 - 11390 + 1))
-                coords = get_slice_mgrid(261, 261, float(z_coords[0]))
-                self.test_image_partial(261, 261, coords, self.device, batch_size=1000, imagepath=f'{z_coords[0]:.2f}.png')
+                # Save intermediate results
+                z_dim = 11399 - 11390 + 1
+                z_coords = torch.linspace(0, z_dim, steps=z_dim)
+                z_coords = 2*(z_coords-(z_dim/2)) / z_dim
+
+                # Save a reconstructed image for a single slice
+                print(f'Reconstructing slice {z_coords[0]:.2f}...')
+                coords = get_slice_mgrid(H, W, float(z_coords[0]))
+                self.test_image_partial(H, W, coords, self.device, batch_size=1000, imagepath=f'{z_coords[0]:.2f}.png')
+
+                # Save a generalized slice
+                offset = (z_coords[1] - z_coords[0]) / 2.
+                z_gen = z_coords[0] + offset
+                print(f'Generalizing slice {z_gen:.2f}...')
+                coords = get_slice_mgrid(H, W, float(z_gen))
+                self.test_image_partial(H, W, coords, self.device, batch_size=1000, imagepath=f'{z_gen:.2f}.png')
 
                 self.save_checkpoint(full=False, best=True)
 
@@ -681,7 +696,6 @@ class Trainer(object):
                     self.ema.store()
                     self.ema.copy_to()
 
-                # cube sampling.
                 cube_samples = self.get_cube_samples(self.num_cube_samples, input_coords, self.length)
                 with torch.cuda.amp.autocast(enabled=self.fp16):
                     preds, truths, loss = self.eval_step(colors, cube_samples, input_coords)
@@ -734,10 +748,6 @@ class Trainer(object):
         # Calculate the colors
         values = term_1 * term_2 * samples[:, :-1, 2]
         colors = torch.sum(values, dim=1)
-        # print("Colors range: ", colors.min(), colors.max())
-
-        # Clamp the colors to [0, 1]
-        # colors = torch.clamp(colors, min=0, max=1)
 
         return colors
 
