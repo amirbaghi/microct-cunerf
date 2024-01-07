@@ -12,6 +12,7 @@ class INGPNetworkRHINO(nn.Module):
                  encoding="hashgrid",
                  num_layers=5,
                  hidden_dim=128,
+                 hidden_dim_last=128,
                 #  For encoder
                  input_dim=3,
                  multires=6, 
@@ -25,7 +26,9 @@ class INGPNetworkRHINO(nn.Module):
                 # For transformer
                  freq = 9,
                  transformer_num_layers = 1,
-                 transformer_hidden_dim = 64
+                 transformer_hidden_dim = 64,
+                 # Skips
+                 skips = [4, 8]
                  ):
         super().__init__()
 
@@ -34,23 +37,31 @@ class INGPNetworkRHINO(nn.Module):
         self.in_dim = self.encoder.output_dim + self.transformer.output_dim
         self.num_layers = num_layers
         self.hidden_dim = hidden_dim
+        self.hidden_dim_last = hidden_dim_last
+        self.skips = skips
 
         backbone = []
 
         # Add the in and out layer + the hidden layers inbetween.
-        for l in range(num_layers):
+        for l in range(num_layers - 1):
             if l == 0:
                 in_dim = self.in_dim
             else:
-                in_dim = self.hidden_dim
+                if l in self.skips:
+                    in_dim = self.in_dim + self.hidden_dim
+                    print("Indims: ", in_dim)
+                else:
+                    in_dim = self.hidden_dim
             
-            if l == num_layers - 1:
-                out_dim = 2
+            if l == num_layers - 2:
+                out_dim = self.hidden_dim_last
             else:
                 out_dim = self.hidden_dim
             
             # Bias set to true, False might be better.
             backbone.append(nn.Linear(in_dim, out_dim, bias=True))
+
+        backbone.append(nn.Linear(self.hidden_dim_last, 2, bias=True))
 
         self.backbone = nn.ModuleList(backbone)
 
@@ -64,8 +75,11 @@ class INGPNetworkRHINO(nn.Module):
         for l in range(self.num_layers):
             cf = self.backbone[l](cf)
             if l != self.num_layers - 1:
-                # If not last layer, apply ReLU (0+)
+                
                 cf = F.relu(cf, inplace=True)
+                
+                if l+1 in self.skips:
+                    cf = torch.cat((cf, h, t), dim=1)
 
         colors = torch.sigmoid(cf[:,0])
         densities = F.relu(cf[:,1])

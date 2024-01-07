@@ -26,6 +26,7 @@ from torchvision.transforms.functional import InterpolationMode
 from torchvision.transforms import Compose, ToTensor, Normalize, Resize
 import tifffile as tiff
 import os
+import torch
 
 def find_directory(dir_name):
     current_dir = os.getcwd()
@@ -43,8 +44,6 @@ def seed_everything(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
-    #torch.backends.cudnn.deterministic = True
-    #torch.backends.cudnn.benchmark = True
 
 def get_mgrid(x_dim, y_dim, z_dim):
     tensors = tuple([torch.linspace(-1, 1, steps=x_dim)] + [torch.linspace(-1, 1, steps=y_dim)] + [torch.linspace(-1, 1, steps=z_dim)])
@@ -54,26 +53,6 @@ def get_mgrid(x_dim, y_dim, z_dim):
     indices = np.lexsort((grid[:, 1], grid[:, 0], grid[:, 2]))
     grid = grid[indices]
     return grid
-
-# def get_mgrid_single_slice(x_dim, y_dim, z_slice):
-#     tensors = tuple([torch.linspace(-1, 1, steps=x_dim)] + [torch.linspace(-1, 1, steps=y_dim)] + [torch.tensor([z_slice])])
-#     grid = torch.stack(torch.meshgrid(*tensors, indexing="ij"), dim=-1)
-#     grid = grid.reshape(-1, 3)
-#     grid = (grid - 0) / grid.max()
-#     return grid
-
-def normalize(coordinates, x_dim, y_dim, z_dim):
-    x = coordinates[:, 0]
-    y = coordinates[:, 1]
-    z = coordinates[:, 2]
-
-    x_norm = 2*(x-(x_dim/2)) / x_dim
-    y_norm = 2*(y-(y_dim/2)) / y_dim
-    z_norm = 2*(z-(z_dim/2)) / z_dim
-    # 2 * (-1 - (1 / 2)) / 1
-
-    norm_coordinates = torch.stack([x_norm, y_norm, z_norm], dim=1)
-    return norm_coordinates
 
 def get_slice_mgrid(x_dim, y_dim, z):
 
@@ -87,10 +66,55 @@ def get_slice_mgrid(x_dim, y_dim, z):
     indices = np.lexsort((grid[:, 0].cpu().numpy(), grid[:, 1].cpu().numpy()))
     grid = grid[indices]
 
-    # Replace all of the z coordinates with the given z value
+    # Replace the z coordinates with the given z value
     grid[:, 2] = z
 
     return grid
+
+def get_view_mgrid(x_dim, y_dim, translation, rotation_angles):
+
+    # Generate translation matrix for the given translation vector
+    translation_matrix = torch.eye(4)
+    translation_matrix[0, 3] = translation[0]
+    translation_matrix[1, 3] = translation[1]
+    translation_matrix[2, 3] = translation[2]
+
+    # Generate rotation matrix for the given rotation vector given in euler angles
+    rotation_matrix = R.from_euler('xyz', rotation_angles, degrees=True).as_matrix()
+    rotation_matrix = torch.from_numpy(rotation_matrix)
+
+    # Convert the 3x3 rotation matrix to a 4x4 matrix
+    rotation_matrix_4x4 = torch.eye(4)
+    rotation_matrix_4x4[:3, :3] = rotation_matrix
+
+    # Generate the view matrix
+    transformation_matrix = torch.matmul(translation_matrix, rotation_matrix_4x4)
+
+    # Generate the coordinates for the new view by multiplying the transformation matrix with the middle slice coordinates
+    p0 = get_slice_mgrid(x_dim, y_dim, 1/2)
+
+    # Convert p0 to homogeneous coordinates
+    p0_homogeneous = torch.cat([p0, torch.ones(p0.shape[0], 1)], dim=1).T
+
+    p_new = torch.matmul(transformation_matrix, p0_homogeneous)
+
+    # Convert p_new back to 3D coordinates
+    p_new = p_new[:3, :].T
+
+    return p_new
+
+def normalize(coordinates, x_dim, y_dim, z_dim):
+    x = coordinates[:, 0]
+    y = coordinates[:, 1]
+    z = coordinates[:, 2]
+
+    x_norm = 2*(x-(x_dim/2)) / x_dim
+    y_norm = 2*(y-(y_dim/2)) / y_dim
+    z_norm = 2*(z-(z_dim/2)) / z_dim
+
+    norm_coordinates = torch.stack([x_norm, y_norm, z_norm], dim=1)
+    return norm_coordinates
+
 
 class MicroCTVolume(Dataset):
     def __init__(self, colors, coords, H, W):
@@ -137,9 +161,7 @@ class Trainer(object):
                  scheduler_update_every_step=False, # whether to call scheduler.step() after every train step
                  length=torch.tensor([1.0, 1.0, 1.0]),
                  num_cube_samples=64,
-                 num_fine_samples=192,
-                 H = 261,
-                 W = 261
+                 num_fine_samples=192
                  ):
         
         self.name = name
@@ -161,8 +183,6 @@ class Trainer(object):
         self.length = length
         self.num_cube_samples = num_cube_samples
         self.num_fine_samples = num_fine_samples
-        self.H = H
-        self.W = W
 
         coarse_model.to(self.device)
         fine_model.to(self.device)
@@ -208,7 +228,7 @@ class Trainer(object):
             script_dir = os.path.dirname(os.path.abspath(__file__))
             self.workspace = os.path.join(script_dir, self.workspace)
             os.makedirs(self.workspace, exist_ok=True)
-            self.log_path = os.path.join(workspace, f"log_{self.name}.txt")
+            self.log_path = os.path.join(self.workspace, f"log_{self.name}.txt")
             self.log_ptr = open(self.log_path, "a+")
 
             self.ckpt_path = os.path.join(self.workspace, 'checkpoints')
@@ -315,7 +335,7 @@ class Trainer(object):
             coord_batch = coord_batch.to(device)
             
             # Get the coordinates and distances of the coarse samples for each center
-            cube_samples = self.get_cube_samples(16, coord_batch, self.length)
+            cube_samples = self.get_cube_samples(32, coord_batch, self.length)
             coords = cube_samples[:, :, :3]
             distances = cube_samples[:, :, 3]
 
@@ -337,7 +357,7 @@ class Trainer(object):
                                                     densities_c.unsqueeze(2), colors_c.unsqueeze(2)), dim=2))
 
             # Get fine samples for each center pixel
-            fine_samples = self.get_cube_samples_hierarchical(16, coord_batch, distances, densities_c)
+            fine_samples = self.get_cube_samples_hierarchical(32, coord_batch, distances, densities_c)
 
             # Predict the color and density of the fine samples
             fine_coords = torch.cat((coords, fine_samples[:, :,:3]), dim=1)
@@ -370,6 +390,8 @@ class Trainer(object):
         model_img = img_pred.view(height,width).numpy()
 
         # Save prediction image
+        model_img = (model_img * 65535).astype(np.uint16)
+        model_img = np.array(model_img, dtype=np.uint16)
         plt.imsave(imagepath, model_img, cmap="gray")
 
         return img_pred
@@ -487,6 +509,14 @@ class Trainer(object):
         # Adaptive Regularization Term 
         adapt_reg = torch.sqrt(loss_fine)
 
+        # # Get random indices of non-zero pixels
+        # non_zero_indices = torch.nonzero(pixels.view(-1)).squeeze()
+
+        # # Print a random sample of the pixels and the corresponding fine predictions
+        # random_indices = torch.randint(0, non_zero_indices.size(0), (10,))
+        # print(f'Pixels: {pixels[non_zero_indices[random_indices]]}')
+        # print(f'Fine predictions: {preds_fine[non_zero_indices[random_indices]]}')
+
         return adapt_reg * loss_coarse + loss_fine
 
     def train_step(self, label, input, centers):
@@ -505,6 +535,8 @@ class Trainer(object):
         # Reshape the flat output to the original input shape
         colors_c = torch.reshape(colors_flat, list(coords.shape[:-1]))
         densities_c = torch.reshape(densities_flat, list(coords.shape[:-1]))
+
+        # print("Max and min coarse density: ", densities_c.max(), densities_c.min())
 
         # Normalize the distances
         normalized_dists = distances / self.length.max()
@@ -533,6 +565,8 @@ class Trainer(object):
         densities_f = densities_f.gather(1, inds)
         colors_f = colors_f.gather(1, inds)
 
+        # print("Max and min fine density: ", densities_f.max(), densities_f.min())
+
         # Normalize the distances
         normalized_dists_f = distances_f / self.length.max()
 
@@ -550,9 +584,16 @@ class Trainer(object):
     def train(self, train_loader, valid_loader, max_epochs, H, W):
 
         for epoch in range(self.epoch + 1, max_epochs + 1):
+
             self.epoch = epoch
 
             self.train_one_epoch(train_loader)
+
+            # self.num_cube_samples = min(self.num_cube_samples + 32, 320)
+            # self.num_fine_samples = min(self.num_fine_samples + 32, 352)
+
+            print("Current number of coarse samples: ", self.num_cube_samples)
+            print("Current number of fine samples: ", self.num_fine_samples)
 
             if self.workspace is not None:
                 self.save_checkpoint(full=True, best=False)
@@ -566,13 +607,13 @@ class Trainer(object):
                 z_coords = 2*(z_coords-(z_dim/2)) / z_dim
 
                 # Save a reconstructed image for a single slice
-                print(f'Reconstructing slice {z_coords[0]:.2f}...')
-                coords = get_slice_mgrid(H, W, float(z_coords[0]))
-                self.test_image_partial(H, W, coords, self.device, batch_size=1000, imagepath=f'{z_coords[0]:.2f}.png')
+                print(f'Reconstructing slice {z_coords[2]:.2f}...')
+                coords = get_slice_mgrid(H, W, float(z_coords[2]))
+                self.test_image_partial(H, W, coords, self.device, batch_size=1000, imagepath=f'{z_coords[2]:.2f}.png')
 
                 # Save a generalized slice
-                offset = (z_coords[1] - z_coords[0]) / 2.
-                z_gen = z_coords[0] + offset
+                offset = (z_coords[3] - z_coords[2]) / 2.
+                z_gen = z_coords[2] + offset
                 print(f'Generalizing slice {z_gen:.2f}...')
                 coords = get_slice_mgrid(H, W, float(z_gen))
                 self.test_image_partial(H, W, coords, self.device, batch_size=1000, imagepath=f'{z_gen:.2f}.png')
@@ -727,6 +768,7 @@ class Trainer(object):
         values = term_1 * term_2 * samples[:, :-1, 2]
         colors = torch.sum(values, dim=1)
 
+        # print("Max and min color: ", colors.max(), colors.min())
         return colors
 
     def get_cube_samples(self, n_samples, centers, dimensions):

@@ -1,15 +1,15 @@
-[INFO] Trainer: ngp | 2024-01-06_19-55-34 | cuda:0 | fp32 | cunerf-rhino-fine2
-[INFO] #parameters: 4023474
+[INFO] Trainer: ngp | 2024-01-07_18-18-23 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-fine8
+[INFO] #parameters: 4164430
 [INFO] Loading latest checkpoint ...
 [WARN] No checkpoint found, model randomly initialized.
 ==> Start Training Epoch 1, lr=0.001000 ...
 ==> Finished Epoch 1.
 ++> Evaluate at epoch 1 ...
 ++> Evaluate epoch 1 Finished.
-[INFO] New best result: None --> 0.08028422828231539
+[INFO] New best result: None --> 0.013339159478034292
 ==> Start Training Epoch 2, lr=0.001000 ...
 ==> Finished Epoch 2.
 ++> Evaluate at epoch 2 ...
 ++> Evaluate epoch 2 Finished.
-[INFO] New best result: 0.08028422828231539 --> 0.08023723108427865
+[INFO] New best result: 0.013339159478034292 --> 0.008841582041765963
 ==> Start Training Epoch 3, lr=0.001000 ...
