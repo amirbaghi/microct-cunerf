@@ -17,6 +17,8 @@ import torch.nn.functional as F
 import torch.distributed as dist
 from torch.utils.data import Dataset, DataLoader
 
+from scipy.spatial.transform import Rotation as R
+
 from rich.console import Console
 from torch_ema import ExponentialMovingAverage
 
@@ -71,6 +73,7 @@ def get_slice_mgrid(x_dim, y_dim, z):
 
     return grid
 
+
 def get_view_mgrid(x_dim, y_dim, translation, rotation_angles):
 
     # Generate translation matrix for the given translation vector
@@ -91,12 +94,18 @@ def get_view_mgrid(x_dim, y_dim, translation, rotation_angles):
     transformation_matrix = torch.matmul(translation_matrix, rotation_matrix_4x4)
 
     # Generate the coordinates for the new view by multiplying the transformation matrix with the middle slice coordinates
-    p0 = get_slice_mgrid(x_dim, y_dim, 1/2)
+    p0 = get_slice_mgrid(x_dim, y_dim, 0.0)
+
+    print(p0)
 
     # Convert p0 to homogeneous coordinates
     p0_homogeneous = torch.cat([p0, torch.ones(p0.shape[0], 1)], dim=1).T
 
+    print(p0_homogeneous.shape)
+
     p_new = torch.matmul(transformation_matrix, p0_homogeneous)
+
+    print(p_new[:3, :].T)
 
     # Convert p_new back to 3D coordinates
     p_new = p_new[:3, :].T
@@ -588,12 +597,6 @@ class Trainer(object):
             self.epoch = epoch
 
             self.train_one_epoch(train_loader)
-
-            # self.num_cube_samples = min(self.num_cube_samples + 32, 320)
-            # self.num_fine_samples = min(self.num_fine_samples + 32, 352)
-
-            print("Current number of coarse samples: ", self.num_cube_samples)
-            print("Current number of fine samples: ", self.num_fine_samples)
 
             if self.workspace is not None:
                 self.save_checkpoint(full=True, best=False)

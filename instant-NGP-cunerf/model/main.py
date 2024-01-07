@@ -6,10 +6,9 @@ import torch.optim as optim
 from ngp_network_RHINO import INGPNetworkRHINO
 from ngp_network import INGPNetwork
 from utils import *
-from load_tiff import *
+from load_tiff import load_tiff_images
 from skimage.metrics import structural_similarity
 from torchmetrics.functional import peak_signal_noise_ratio
-    
 
 if __name__ == '__main__':
 
@@ -67,7 +66,6 @@ if __name__ == '__main__':
     
     base_img_path = os.path.join(dataset_dir, base_img_name)
 
-
     if opt.test:
         trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, ema_decay=0.95, fp16=opt.fp16, use_checkpoint='latest',
                          eval_interval=1, length=cube_lengths, num_cube_samples=num_coarse_samples, num_fine_samples=num_fine_samples)
@@ -109,11 +107,17 @@ if __name__ == '__main__':
         trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, ema_decay=0.95, fp16=opt.fp16, use_checkpoint='latest',
                          eval_interval=1, length=cube_lengths, num_cube_samples=num_coarse_samples, num_fine_samples=num_fine_samples)
 
-        translation = opt.translation
-        rotation_angles = opt.rotation_angles
-        view_coords = get_view_mgrid(H, W, translation, rotation_angles)
+        for x_rot in range(0, 360, 10):
+            translation = opt.translation
+            rotation_angles = [x_rot, 0, 0]
+            view_coords = get_view_mgrid(H, W, translation, rotation_angles)
 
-        prediction = trainer.test_image_partial(H, W, view_coords, 'cuda', batch_size=1000, imagepath=f'new_view.png')
+            prediction = trainer.test_image_partial(H, W, view_coords, 'cuda', batch_size=1000, imagepath=f'new_view_{x_rot}.png')
+        # translation = opt.translation
+        # rotation_angles = opt.rotation_angles
+        # view_coords = get_view_mgrid(H, W, translation, rotation_angles)
+
+        # prediction = trainer.test_image_partial(H, W, view_coords, 'cuda', batch_size=1000, imagepath=f'new_view.png')
 
     else:
 

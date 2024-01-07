@@ -69,7 +69,6 @@ def get_view_mgrid(x_dim, y_dim, translation, rotation_angles):
 
     return p_new
 
-
 def normalize(coordinates, x_dim, y_dim, z_dim):
     x = coordinates[:, 0]
     y = coordinates[:, 1]

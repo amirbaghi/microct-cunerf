@@ -49,7 +49,6 @@ class INGPNetworkRHINO(nn.Module):
             else:
                 if l in self.skips:
                     in_dim = self.in_dim + self.hidden_dim
-                    print("Indims: ", in_dim)
                 else:
                     in_dim = self.hidden_dim
             
