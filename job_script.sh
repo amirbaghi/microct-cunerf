@@ -9,4 +9,4 @@ module load PyTorch-bundle/1.13.1-foss-2022a-CUDA-11.7.0
 module load Graphviz/5.0.0-GCCcore-11.3.0
 
 source ./microct_env/bin/activate
-python3 instant-NGP-cunerf/model/main.py --rhino --fp16 --workspace "cunerf-rhino-fine"
+python3 instant-NGP-cunerf/model/main.py --rhino --fp16 --workspace "cunerf-rhino-resize2"

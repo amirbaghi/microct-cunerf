@@ -1,0 +1,20 @@
+[INFO] Trainer: ngp | 2024-01-08_00-10-31 | cuda:0 | fp16 | 
+/cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf
+-rhino-fine-best
+[INFO] #parameters: 4225878
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is 
+/cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf
+-rhino-fine-best/checkpoints/ngp_ep0012.pth.tar
+Traceback (most recent call last):
+  File "/cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/main.py", line 159, in <module>
+    trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, optimizer=optimizer, ema_decay=0.95, fp16=opt.fp16, lr_scheduler=scheduler, use_checkpoint='latest',
+  File "/cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/utils.py", line 255, in __init__
+    self.load_checkpoint()
+  File "/cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/utils.py", line 861, in load_checkpoint
+    self.coarse_model.load_state_dict(checkpoint_dict['coarse_model'])
+  File "/apps/Arch/software/PyTorch/1.13.1-foss-2022a-CUDA-11.7.0/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1671, in load_state_dict
+    raise RuntimeError('Error(s) in loading state_dict for {}:\n\t{}'.format(
+RuntimeError: Error(s) in loading state_dict for INGPNetworkRHINO:
+	size mismatch for encoder.embeddings: copying a param with shape torch.Size([62264, 2]) from checkpoint, the shape in current model is torch.Size([8192, 2]).
+	size mismatch for transformer.backbone.0.weight: copying a param with shape torch.Size([3, 240]) from checkpoint, the shape in current model is torch.Size([3, 120]).

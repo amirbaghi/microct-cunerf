@@ -369,3 +369,21 @@
 [INFO] loaded model.
 [INFO] Generating test images ...
 [INFO] Generating test images ...
+[INFO] Trainer: ngp | 2024-01-07_23-37-56 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-fine-best
+[INFO] #parameters: 4273558
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-fine-best/checkpoints/ngp_ep0012.pth.tar
+[INFO] Trainer: ngp | 2024-01-07_23-40-49 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-fine-best
+[INFO] #parameters: 7082222
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-fine-best/checkpoints/ngp_ep0012.pth.tar
+[INFO] loaded model.
+[INFO] Trainer: ngp | 2024-01-07_23-46-42 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-fine-best
+[INFO] #parameters: 7082222
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-fine-best/checkpoints/ngp_ep0012.pth.tar
+[INFO] loaded model.
+[INFO] Trainer: ngp | 2024-01-08_00-10-31 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-fine-best
+[INFO] #parameters: 4225878
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-fine-best/checkpoints/ngp_ep0012.pth.tar

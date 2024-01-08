@@ -37,7 +37,7 @@ if __name__ == '__main__':
     end_slice = opt.end_slice
     base_img_name = opt.base_img_name
 
-    colors, coords, H, W = load_tiff_images(start_slice, end_slice, base_img_name, resize_factor=8)
+    colors, coords, H, W = load_tiff_images(start_slice, end_slice, base_img_name, resize_factor=2)
     H, W = int(H), int(W)
     cube_lengths = torch.tensor([0.0001, 0.0001, 2. / (end_slice - start_slice + 1)], device='cuda')
 
@@ -47,12 +47,19 @@ if __name__ == '__main__':
 
     # Add the paramters for the network.
     if opt.rhino:
+        # coarse_model = INGPNetworkRHINO(num_layers=9, hidden_dim=128, skips=[4, 7], input_dim=3, num_levels=8,
+        #                 level_dim=2, base_resolution=16, log2_hashmap_size=13, desired_resolution=H, 
+        #                 align_corners=False, freq=40, transformer_num_layers=1, transformer_hidden_dim=32)
+        # fine_model = INGPNetworkRHINO(num_layers=9, hidden_dim=256, skips=[4, 7], input_dim=3, num_levels=16,
+        #         level_dim=4, base_resolution=16, log2_hashmap_size=17, desired_resolution=2*H, 
+        #         align_corners=False, freq=50, transformer_num_layers=1, transformer_hidden_dim=32)
+
         coarse_model = INGPNetworkRHINO(num_layers=9, hidden_dim=128, skips=[4, 7], input_dim=3, num_levels=8,
-                        level_dim=2, base_resolution=16, log2_hashmap_size=13, desired_resolution=H, 
-                        align_corners=False, freq=40, transformer_num_layers=1, transformer_hidden_dim=32)
+                        level_dim=2, base_resolution=16, log2_hashmap_size=10, desired_resolution=H, 
+                        align_corners=False, freq=20, transformer_num_layers=1, transformer_hidden_dim=32)
         fine_model = INGPNetworkRHINO(num_layers=9, hidden_dim=256, skips=[4, 7], input_dim=3, num_levels=16,
-                level_dim=4, base_resolution=16, log2_hashmap_size=17, desired_resolution=2*H, 
-                align_corners=False, freq=50, transformer_num_layers=1, transformer_hidden_dim=32)
+                level_dim=4, base_resolution=16, log2_hashmap_size=16, desired_resolution=2*H, 
+                align_corners=False, freq=50, transformer_num_layers=1, transformer_hidden_dim=128)
     else:
         model = INGPNetwork(num_layers=5, hidden_dim=512, input_dim=3, num_levels=17, 
                         level_dim=4, base_resolution=16, log2_hashmap_size=21, desired_resolution=261, 

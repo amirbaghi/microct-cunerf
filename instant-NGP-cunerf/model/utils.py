@@ -19,6 +19,8 @@ from torch.utils.data import Dataset, DataLoader
 
 from scipy.spatial.transform import Rotation as R
 
+from pyquaternion import Quaternion
+
 from rich.console import Console
 from torch_ema import ExponentialMovingAverage
 
@@ -74,7 +76,14 @@ def get_slice_mgrid(x_dim, y_dim, z):
     return grid
 
 
-def get_view_mgrid(x_dim, y_dim, translation, rotation_angles):
+def get_view_mgrid(x_dim, y_dim, translation, rotation_angle, rotation_axis):
+
+    # Generate the coordinates for the new view by multiplying the transformation matrix with the middle slice coordinates
+    p0 = get_slice_mgrid(x_dim, y_dim, 0.0)
+
+    # Rotate the coordinates using the angle and rotation axis
+    rot_quat = Quaternion(axis=rotation_axis, angle=rotation_angle)
+    p0 = rot_quat.rotate(p0)
 
     # Generate translation matrix for the given translation vector
     translation_matrix = torch.eye(4)
@@ -82,30 +91,11 @@ def get_view_mgrid(x_dim, y_dim, translation, rotation_angles):
     translation_matrix[1, 3] = translation[1]
     translation_matrix[2, 3] = translation[2]
 
-    # Generate rotation matrix for the given rotation vector given in euler angles
-    rotation_matrix = R.from_euler('xyz', rotation_angles, degrees=True).as_matrix()
-    rotation_matrix = torch.from_numpy(rotation_matrix)
-
-    # Convert the 3x3 rotation matrix to a 4x4 matrix
-    rotation_matrix_4x4 = torch.eye(4)
-    rotation_matrix_4x4[:3, :3] = rotation_matrix
-
-    # Generate the view matrix
-    transformation_matrix = torch.matmul(translation_matrix, rotation_matrix_4x4)
-
-    # Generate the coordinates for the new view by multiplying the transformation matrix with the middle slice coordinates
-    p0 = get_slice_mgrid(x_dim, y_dim, 0.0)
-
-    print(p0)
-
     # Convert p0 to homogeneous coordinates
     p0_homogeneous = torch.cat([p0, torch.ones(p0.shape[0], 1)], dim=1).T
 
-    print(p0_homogeneous.shape)
-
-    p_new = torch.matmul(transformation_matrix, p0_homogeneous)
-
-    print(p_new[:3, :].T)
+    # Translate the coordinates
+    p_new = torch.matmul(translation_matrix, p0_homogeneous)
 
     # Convert p_new back to 3D coordinates
     p_new = p_new[:3, :].T
