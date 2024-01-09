@@ -79,7 +79,7 @@ class Renderer(object):
         self.label2.setFrameShape(QtWidgets.QFrame.Box)
         self.label2.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.label2.setGeometry(QtCore.QRect(10, 150, 180, 20))
-        self.label2.setText("Rotation Axis and Angle")
+        self.label2.setText("Angle and Axis of Rotation")
         self.label2.setAlignment(QtCore.Qt.AlignCenter)
         self.label2.setStyleSheet("QLabel { background-color : #dbd9d9;}")
         
