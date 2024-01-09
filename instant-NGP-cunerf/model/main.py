@@ -30,6 +30,7 @@ if __name__ == '__main__':
     parser.add_argument('--translation', type=float, nargs='+', default=[0.0, 0.0, 0.0], help="translation")
     parser.add_argument('--rotation_angle', type=float, default=0.0, help="rotation angles")
     parser.add_argument('--rotation_axis', type=float, nargs='+', default=[1.0, 0.0, 0.0], help="rotation axis")
+    parser.add_argument('--reconstruct', action='store_true', help="reconstruct")
 
     opt = parser.parse_args()
     seed_everything(opt.seed)
@@ -56,20 +57,20 @@ if __name__ == '__main__':
         #         align_corners=False, freq=50, transformer_num_layers=1, transformer_hidden_dim=32)
 
         # # Use this! cunerf-rhino-resize4
-        # coarse_model = INGPNetworkRHINO(num_layers=9, hidden_dim=128, skips=[4, 7], input_dim=3, num_levels=8,
-        #                 level_dim=2, base_resolution=16, log2_hashmap_size=10, desired_resolution=H, 
-        #                 align_corners=False, freq=20, transformer_num_layers=1, transformer_hidden_dim=32)
-        # fine_model = INGPNetworkRHINO(num_layers=9, hidden_dim=256, skips=[4, 7], input_dim=3, num_levels=16,
-        #         level_dim=4, base_resolution=16, log2_hashmap_size=16, desired_resolution=2*H, 
-        #         align_corners=False, freq=50, transformer_num_layers=1, transformer_hidden_dim=128)
+        coarse_model = INGPNetworkRHINO(num_layers=9, hidden_dim=128, skips=[4, 7], input_dim=3, num_levels=8,
+                        level_dim=2, base_resolution=16, log2_hashmap_size=10, desired_resolution=H, 
+                        align_corners=False, freq=20, transformer_num_layers=1, transformer_hidden_dim=32)
+        fine_model = INGPNetworkRHINO(num_layers=9, hidden_dim=256, skips=[4, 7], input_dim=3, num_levels=16,
+                level_dim=4, base_resolution=16, log2_hashmap_size=16, desired_resolution=2*H, 
+                align_corners=False, freq=50, transformer_num_layers=1, transformer_hidden_dim=128)
 
        # Use this! cunerf-rhino-2-r4
-        coarse_model = INGPNetworkRHINO(num_layers=5, hidden_dim=128, skips=[3], input_dim=3, num_levels=16,
-                        level_dim=2, base_resolution=16, log2_hashmap_size=12, desired_resolution=H, 
-                        align_corners=False, freq=20, transformer_num_layers=1, transformer_hidden_dim=32)
-        fine_model = INGPNetworkRHINO(num_layers=5, hidden_dim=256, skips=[3], input_dim=3, num_levels=16,
-                level_dim=2, base_resolution=16, log2_hashmap_size=18, desired_resolution=H, 
-                align_corners=False, freq=50, transformer_num_layers=1, transformer_hidden_dim=128)
+        # coarse_model = INGPNetworkRHINO(num_layers=5, hidden_dim=128, skips=[3], input_dim=3, num_levels=16,
+        #                 level_dim=2, base_resolution=16, log2_hashmap_size=12, desired_resolution=H, 
+        #                 align_corners=False, freq=20, transformer_num_layers=1, transformer_hidden_dim=32)
+        # fine_model = INGPNetworkRHINO(num_layers=5, hidden_dim=256, skips=[3], input_dim=3, num_levels=16,
+        #         level_dim=2, base_resolution=16, log2_hashmap_size=18, desired_resolution=H, 
+        #         align_corners=False, freq=50, transformer_num_layers=1, transformer_hidden_dim=128)
     else:
         model = INGPNetwork(num_layers=5, hidden_dim=512, input_dim=3, num_levels=17, 
                         level_dim=4, base_resolution=16, log2_hashmap_size=21, desired_resolution=261, 

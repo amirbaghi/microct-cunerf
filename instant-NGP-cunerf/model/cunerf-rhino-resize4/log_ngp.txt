@@ -74,3 +74,20 @@
 ++> Evaluate epoch 15 Finished.
 [INFO] New best result: 0.005337211541960382 --> 0.005278372912601169
 [INFO] Generating test images ...
+[INFO] Trainer: ngp | 2024-01-09_19-17-29 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.
+[INFO] Trainer: ngp | 2024-01-09_19-19-41 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.
+[INFO] Generating ground truth images ...
+[INFO] Trainer: ngp | 2024-01-09_19-21-02 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.
+[INFO] Generating ground truth images ...
