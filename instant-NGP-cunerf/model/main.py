@@ -64,11 +64,11 @@ if __name__ == '__main__':
         #         align_corners=False, freq=50, transformer_num_layers=1, transformer_hidden_dim=128)
 
        # Use this! cunerf-rhino-2-r4
-        coarse_model = INGPNetworkRHINO(num_layers=9, hidden_dim=128, skips=[4, 7], input_dim=3, num_levels=16,
-                        level_dim=2, base_resolution=16, log2_hashmap_size=15, desired_resolution=H, 
+        coarse_model = INGPNetworkRHINO(num_layers=5, hidden_dim=128, skips=[3], input_dim=3, num_levels=16,
+                        level_dim=2, base_resolution=16, log2_hashmap_size=12, desired_resolution=H, 
                         align_corners=False, freq=20, transformer_num_layers=1, transformer_hidden_dim=32)
-        fine_model = INGPNetworkRHINO(num_layers=9, hidden_dim=256, skips=[4, 7], input_dim=3, num_levels=16,
-                level_dim=2, base_resolution=16, log2_hashmap_size=12, desired_resolution=2*H, 
+        fine_model = INGPNetworkRHINO(num_layers=5, hidden_dim=256, skips=[3], input_dim=3, num_levels=16,
+                level_dim=2, base_resolution=16, log2_hashmap_size=18, desired_resolution=H, 
                 align_corners=False, freq=50, transformer_num_layers=1, transformer_hidden_dim=128)
     else:
         model = INGPNetwork(num_layers=5, hidden_dim=512, input_dim=3, num_levels=17, 
@@ -83,12 +83,18 @@ if __name__ == '__main__':
     
     base_img_path = os.path.join(dataset_dir, base_img_name)
 
-    if opt.test:
+    if opt.reconstruct:
         trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, ema_decay=0.95, fp16=opt.fp16, use_checkpoint='latest',
                          eval_interval=1, length=cube_lengths, num_cube_samples=num_coarse_samples, num_fine_samples=num_fine_samples)
         H, W = int(H), int(W)
-        trainer.test(0, 1, (end_slice-start_slice+1), H, W, batch_size=1000)
-        trainer.test(0, 1, 2 * (end_slice-start_slice+1), H, W, batch_size=1000)
+        trainer.create_ground_truths(H, W, opt.start_slice, opt.end_slice, colors, coords)
+
+    elif opt.test:
+        trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, ema_decay=0.95, fp16=opt.fp16, use_checkpoint='latest',
+                         eval_interval=1, length=cube_lengths, num_cube_samples=num_coarse_samples, num_fine_samples=num_fine_samples)
+        H, W = int(H), int(W)
+        trainer.test(0, (end_slice-start_slice+1), (end_slice-start_slice+1), H, W, batch_size=1000)
+        trainer.test(0, (end_slice-start_slice+1), 2 * (end_slice-start_slice+1), H, W, batch_size=1000)
 
     elif opt.test_on_slice:
         print(f'Testing on slice {opt.test_slice}...')

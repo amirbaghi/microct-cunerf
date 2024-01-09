@@ -1,0 +1,27 @@
+This job can be monitored from: https://scruffy.c3se.chalmers.se/d/alvis-job/alvis-job?var-jobid=1738815&from=1704820758000
+[INFO] Trainer: ngp | 2024-01-09_18-20-04 | cuda:0 | fp16 | 
+/cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf
+-rhino-2-r4
+[INFO] #parameters: 1296614
+[INFO] Loading latest checkpoint ...
+[WARN] No checkpoint found, model randomly initialized.
+==> Start Training Epoch 1, lr=0.001000 ...
+  0% 0/2725000 [00:00<?, ?it/s]Traceback (most recent call last):
+  File "/cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/main.py", line 176, in <module>
+    trainer.train(train_loader, valid_loader, 15, H, W)
+  File "/cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/utils.py", line 589, in train
+    self.train_one_epoch(train_loader)
+  File "/cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/utils.py", line 647, in train_one_epoch
+    preds, truths, loss = self.train_step(colors, cube_samples, input_coords)
+  File "/cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/utils.py", line 532, in train_step
+    colors_flat, densities_flat = self.coarse_model(coords_flat)
+  File "/apps/Arch/software/PyTorch/1.13.1-foss-2022a-CUDA-11.7.0/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/ngp_network_RHINO.py", line 75, in forward
+    cf = self.backbone[l](cf)
+  File "/apps/Arch/software/PyTorch/1.13.1-foss-2022a-CUDA-11.7.0/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1194, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/apps/Arch/software/PyTorch/1.13.1-foss-2022a-CUDA-11.7.0/lib/python3.10/site-packages/torch/nn/modules/linear.py", line 114, in forward
+    return F.linear(input, self.weight, self.bias)
+RuntimeError: mat1 and mat2 shapes cannot be multiplied (320000x163 and 128x2)
+  0% 0/2725000 [00:02<?, ?it/s]

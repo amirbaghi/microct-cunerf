@@ -75,6 +75,45 @@ def get_slice_mgrid(x_dim, y_dim, z):
 
     return grid
 
+def create_ground_truths(self, H, W, start_slice_index, end_slice_index, colors, coords):
+        self.log("[INFO] Generating ground truth images ...")   
+
+        img = torch.empty(H * W, 1)
+
+        total_psnr = 0
+        for s in range(end_slice_index-start_slice_index+1):
+            slice_colors = colors[s]
+            slice_coords = coords.view(colors.shape[0], H, W, 3)[s].view(-1, 3)
+
+            pred = self.test_image_partial(H, W, slice_coords, self.device, batch_size=1000, imagepath=f'pred_{s}.png')
+            print(pred.shape)
+            gt_image = slice_colors.view(H,W).numpy()
+
+            # Flatten slice_colors
+            slice_colors = slice_colors.view(-1, 1).squeeze(1)
+            print(slice_colors.shape)
+
+            # Save ground truth image
+            gt_image = (gt_image * 65535).astype(np.uint16)
+            gt_image = np.array(gt_image, dtype=np.uint16)
+            plt.imsave(f'gt_{s}.png', gt_image, cmap="gray")
+
+            # Calculate the loss
+            mse = torch.nn.MSELoss()
+            mse = mse(pred, slice_colors).item()
+            psnr = 20 * np.log10(slice_colors.max() / np.sqrt(mse))
+            
+            # Calculate SSIM
+            pred = pred.numpy()
+            slice_colors = slice_colors.numpy()
+            ssim = structural_similarity(pred, slice_colors, data_range=slice_colors.max() - slice_colors.min())
+
+            # Print PSNR and SSIM
+            print(f'Image {s}: MSE: {mse:.6f} and PSNR: {psnr:.6f} and SSIM: {ssim:.6f}')
+            total_psnr += psnr
+        
+        print("Average PSNR: ", total_psnr / (end_slice_index-start_slice_index+1))
+
 
 def get_view_mgrid(x_dim, y_dim, translation, rotation_angle, rotation_axis):
 
