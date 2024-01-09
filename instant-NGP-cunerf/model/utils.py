@@ -16,7 +16,9 @@ import torch.optim as optim
 import torch.nn.functional as F
 import torch.distributed as dist
 from torch.utils.data import Dataset, DataLoader
+
 from skimage.metrics import structural_similarity
+import lpips
 
 from scipy.spatial.transform import Rotation as R
 
@@ -273,6 +275,7 @@ class Trainer(object):
 
         total_psnr = 0
         total_ssim = 0
+        total_lpips = 0
         for s in range(end_slice_index-start_slice_index+1):
             slice_colors = colors[s]
             slice_coords = coords.view(colors.shape[0], H, W, 3)[s].view(-1, 3)
@@ -294,19 +297,30 @@ class Trainer(object):
             psnr = 20 * np.log10(slice_colors.max() / np.sqrt(mse))
             
             # Calculate SSIM
-            pred = pred.numpy()
-            slice_colors = slice_colors.numpy()
-            ssim = structural_similarity(pred, slice_colors, data_range=slice_colors.max() - slice_colors.min())
+            p_np = pred.numpy()
+            c_np = slice_colors.numpy()
+            ssim = structural_similarity(p_np, c_np, data_range=c_np.max() - c_np.min())
+
+            # Calculate LPIPS
+            pred = pred.reshape(1, 1, H, W)
+            slice_colors = slice_colors.reshape(1, 1, H, W)
+
+            lpips_fn = lpips.LPIPS(net='alex')
+            lpips_score = lpips_fn(pred, slice_colors)
+            lpips_score = lpips_score.item()
 
             # Print PSNR and SSIM
-            print(f'Image {s}: MSE: {mse:.6f} and PSNR: {psnr:.6f} and SSIM: {ssim:.6f}')
+            print(f'Image {s}: MSE: {mse:.6f} and PSNR: {psnr:.6f}, SSIM: {ssim:.6f}, and LPIPS: {lpips_score:.6f}')
             total_psnr += psnr
             total_ssim += ssim
+            total_lpips += lpips_score
         
         average_psnr = total_psnr / (end_slice_index-start_slice_index+1)
-        print("Average PSNR: ", average_psnr)
+        print("Average PSNR: ", average_psnr.value)
         average_ssim = total_ssim / (end_slice_index-start_slice_index+1)
         print("Average SSIM: ", average_ssim)
+        average_lpips = total_lpips / (end_slice_index-start_slice_index+1)
+        print("Average LPIPS: ", average_lpips)
 
         return average_psnr, average_ssim
 
