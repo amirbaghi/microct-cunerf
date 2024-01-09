@@ -1,4 +1,5 @@
 import torch
+import optuna
 import argparse
 from torch.utils.data import DataLoader
 import torch.optim as optim
@@ -9,6 +10,107 @@ from utils import *
 from load_tiff import load_tiff_images
 from skimage.metrics import structural_similarity
 from torchmetrics.functional import peak_signal_noise_ratio
+
+def train_model(trial, start_slice, end_slice, base_img_path, lr, fp16, workspace, resize_factor, maximum_parameters=8000000):
+
+    # Load the data
+    colors, coords, H, W = load_tiff_images(start_slice, end_slice, base_img_name, resize_factor=resize_factor)
+    H, W = int(H), int(W)
+
+    # Suggest values for the hyperparameters
+    num_layers_c = trial.suggest_int('num_layers_c', 5, 9)
+    num_layers_f = trial.suggest_int('num_layers_f', 5, 9)
+    
+    hidden_dim_c = trial.suggest_categorical('hidden_dim_c', [128, 256, 512])
+    hidden_dim_f = trial.suggest_categorical('hidden_dim_f', [128, 256, 512])
+
+    num_levels_c = trial.suggest_categorical('num_levels_c', [2, 4, 8, 16, 32, 64])
+    num_levels_f = trial.suggest_categorical('num_levels_f', [2, 4, 8, 16, 32, 64])
+
+    level_dim_c = trial.suggest_categorical('level_dim_c', [2, 4, 8])
+    level_dim_f = trial.suggest_categorical('level_dim_f', [2, 4, 8])
+    
+    base_resolution_c = trial.suggest_categorical('base_resolution_c', [8, 16, 32])
+    base_resolution_f = trial.suggest_categorical('base_resolution_f', [8, 16, 32])
+
+    log2_hashmap_size_c = trial.suggest_int('log2_hashmap_size_c', 10, 20)
+    log2_hashmap_size_f = trial.suggest_int('log2_hashmap_size_f', 10, 21)
+
+    desired_resolution_f = trial.suggest_categorical('desired_resolution_f', [H / 2, H, 2 * H])
+
+    align_corners = trial.suggest_categorical('align_corners', [True, False])
+
+    freq_c = trial.suggest_categorical('freq_c', [10, 20, 40, 50, 70, 80])
+    freq_f = trial.suggest_categorical('freq_f', [10, 20, 40, 50, 70, 80])
+
+    transformer_layers_c = trial.suggest_categorical('transformer_layers_c', [1])
+    transformer_layers_f = trial.suggest_categorical('transformer_layers_f', [1])
+
+    transformer_neurons_c = trial.suggest_categorical('transformer_neurons_c', [32, 64, 128, 256, 512])
+    transformer_neurons_f = trial.suggest_categorical('transformer_neurons_f', [32, 64, 128, 256, 512])
+
+    cube_xy_length = trial.suggest_categorical('cube_xy_length', [0.00001, 0.0001, 0.0005, 1. / H, 2. / H, 4. / H])
+    cube_z_length = trial.suggest_categorical('cube_z_length', [1. / (end_slice - start_slice + 1), 2. / (end_slice - start_slice + 1), 4. / (end_slice - start_slice + 1)])
+
+
+    # Set the length of the cube
+    cube_lengths = torch.tensor([cube_xy_length, cube_xy_length, cube_z_length], device='cuda')
+
+    # Initialize the models
+    coarse_model = INGPNetworkRHINO(num_layers=num_layers_c, hidden_dim=hidden_dim_c, skips=[4, 7], input_dim=3, num_levels=num_levels_c,
+                    level_dim=level_dim_c, base_resolution=base_resolution_c, log2_hashmap_size=log2_hashmap_size_c, desired_resolution=H, 
+                    align_corners=align_corners, freq=freq_c, transformer_num_layers=transformer_layers_c, transformer_hidden_dim=transformer_neurons_c)
+    fine_model = INGPNetworkRHINO(num_layers=num_layers_f, hidden_dim=hidden_dim_f, skips=[4, 7], input_dim=3, num_levels=num_levels_f,
+            level_dim=level_dim_f, base_resolution=base_resolution_f, log2_hashmap_size=log2_hashmap_size_f, desired_resolution=desired_resolution_f, 
+            align_corners=align_corners, freq=freq_f, transformer_num_layers=transformer_layers_f, transformer_hidden_dim=transformer_neurons_f)
+
+    # Check to see if the number of all parameters is less than the maximum
+    num_params = sum([p.numel() for p in list(coarse_model.parameters()) + list(fine_model.parameters()) if p.requires_grad])
+    if num_params > maximum_parameters:
+        return 0
+
+    # Set the number of samples inside the cube
+    num_coarse_samples = 64
+    num_fine_samples = 192
+
+    # Create dataset and dataloader for train and validation set
+    num_samples = 5000
+    train_dataset = MicroCTVolume(colors, coords, H, W)
+    train_loader = DataLoader(train_dataset, batch_size=num_samples, shuffle=True, generator=torch.Generator(device='cpu'))
+
+    valid_dataset = MicroCTVolume(colors[0], coords.view(colors.shape[0], H, W, 3)[0].view(-1, 3), H, W)
+    valid_loader  = DataLoader(valid_dataset, batch_size=10000, generator=torch.Generator(device='cpu'))
+
+    optimizer = lambda model: torch.optim.Adam([
+            {'name': 'encoding', 'params': coarse_model.encoder.parameters()},
+            {'name': 'transformer', 'params': coarse_model.transformer.parameters(), 'weight_decay': 1e-6},
+            {'name': 'net', 'params': coarse_model.backbone.parameters(), 'weight_decay': 1e-6},
+            {'name': 'encoding', 'params': fine_model.encoder.parameters()},
+            {'name': 'transformer', 'params': fine_model.transformer.parameters(), 'weight_decay': 1e-6},
+            {'name': 'net', 'params': fine_model.backbone.parameters(), 'weight_decay': 1e-6},
+    ], lr=lr, betas=(0.9, 0.99), eps=1e-15)
+
+    # Create scheduler to reduce the step size after N many epochs.
+    scheduler = lambda optimizer: optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+
+    # Initialize the trainer.
+    trainer = Trainer('ngp', coarse_model, fine_model, workspace=workspace, optimizer=optimizer, ema_decay=0.95, fp16=fp16, lr_scheduler=scheduler, use_checkpoint='scratch',
+                        eval_interval=1, length=cube_lengths, num_cube_samples=num_coarse_samples, num_fine_samples=num_fine_samples)
+    
+    # Train and evaluate
+    try:
+        # Train the network
+        trainer.train(train_loader, valid_loader, 5, H, W)
+
+        # Test out the model
+        avg_psnr, avg_ssim, avg_lpips = trainer.create_ground_truths(H, W, start_slice, end_slice, colors, coords)
+
+        return avg_psnr
+
+    except:
+
+        return 0
+
 
 if __name__ == '__main__':
 
@@ -89,6 +191,13 @@ if __name__ == '__main__':
                          eval_interval=1, length=cube_lengths, num_cube_samples=num_coarse_samples, num_fine_samples=num_fine_samples)
         H, W = int(H), int(W)
         trainer.create_ground_truths(H, W, opt.start_slice, opt.end_slice, colors, coords)
+
+    elif opt.tune:
+        study = optuna.create_study(direction='maximize', study_name='ngp_study', storage='sqlite:////cephyr/users/amirmaso/Alvis/microct-neural-repr/ngp_study.db', load_if_exists=True)
+        study.optimize(lambda trial: train_model(trial, start_slice, end_slice, base_img_path, opt.lr, opt.fp16, opt.workspace, resize_factor=4), n_trials=100)
+        print(study.best_params)
+        print(study.best_value)
+        print(study.best_trial)
 
     elif opt.test:
         trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, ema_decay=0.95, fp16=opt.fp16, use_checkpoint='latest',

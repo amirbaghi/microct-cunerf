@@ -322,7 +322,7 @@ class Trainer(object):
         average_lpips = total_lpips / (end_slice_index-start_slice_index+1)
         print("Average LPIPS: ", average_lpips)
 
-        return average_psnr, average_ssim
+        return average_psnr, average_ssim, average_lpips
 
     def test_on_trained_slice(self, start_slice, end_slice, slice_index, base_img_path, imagepath='pred.png', resize_factor=1, save_img=True):
         self.log("[INFO] Generating test image slice ...")
