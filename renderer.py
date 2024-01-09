@@ -47,7 +47,7 @@ class GraphicsViewWithZoom(QGraphicsView):
 class Renderer(object):
     def setupUi(self, window):
         window.setObjectName("Micro-CT Scan Renderer")
-        window.resize(200, 300)
+        window.resize(200, 330)
 
         # Views
         self.label = QtWidgets.QLabel(window)
@@ -79,29 +79,37 @@ class Renderer(object):
         self.label2.setFrameShape(QtWidgets.QFrame.Box)
         self.label2.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.label2.setGeometry(QtCore.QRect(10, 150, 180, 20))
-        self.label2.setText("Rotation Translation Angles")
+        self.label2.setText("Rotation Axis and Angle")
         self.label2.setAlignment(QtCore.Qt.AlignCenter)
         self.label2.setStyleSheet("QLabel { background-color : #dbd9d9;}")
         
+        
         # Add X Y Z inputs below label2
+
+        self.label2.setAlignment(QtCore.Qt.AlignCenter)
         self.label2 = QtWidgets.QLabel(window)
-        self.label2.setGeometry(QtCore.QRect(10, 180, 20, 20))
+        self.label2.setGeometry(QtCore.QRect(15, 180, 20, 20))
+        self.label2.setText(chr(176)+":")
+        self.addInputs(window)
+
+        self.label2 = QtWidgets.QLabel(window)
+        self.label2.setGeometry(QtCore.QRect(10, 210, 20, 20))
         self.label2.setText("X:")
 
         self.label2.setAlignment(QtCore.Qt.AlignCenter)
         self.label2 = QtWidgets.QLabel(window)
-        self.label2.setGeometry(QtCore.QRect(10, 210, 20, 20))
+        self.label2.setGeometry(QtCore.QRect(10, 240, 20, 20))
         self.label2.setText("Y:")
         
         self.label2.setAlignment(QtCore.Qt.AlignCenter)
         self.label2 = QtWidgets.QLabel(window)
-        self.label2.setGeometry(QtCore.QRect(15, 240, 20, 20))
+        self.label2.setGeometry(QtCore.QRect(15, 270, 20, 20))
         self.label2.setText("Z:")
         self.addInputs(window)
 
         # Add Generate View button
         self.pushButton = QtWidgets.QPushButton(window)
-        self.pushButton.setGeometry(QtCore.QRect(15, 270, 170, 20))
+        self.pushButton.setGeometry(QtCore.QRect(15, 300, 170, 20))
         self.pushButton.setText("Generate View")
         # Make the button call the generateView function when clicked
         self.pushButton.clicked.connect(self.generateView) 
@@ -123,22 +131,28 @@ class Renderer(object):
         self.lineEdit_3.setObjectName("lineEdit_3")
         self.lineEdit_3.setText("0")
 
-        # Angles
+        # Angle
         self.lineEdit_4 = QtWidgets.QLineEdit(window)
         self.lineEdit_4.setGeometry(QtCore.QRect(40, 180, 150, 20))
         self.lineEdit_4.setObjectName("lineEdit_4")
         self.lineEdit_4.setText("0")
 
+        # Angles
         self.lineEdit_5 = QtWidgets.QLineEdit(window)
         self.lineEdit_5.setGeometry(QtCore.QRect(40, 210, 150, 20))
         self.lineEdit_5.setObjectName("lineEdit_5")
         self.lineEdit_5.setText("0")
 
-
         self.lineEdit_6 = QtWidgets.QLineEdit(window)
         self.lineEdit_6.setGeometry(QtCore.QRect(40, 240, 150, 20))
         self.lineEdit_6.setObjectName("lineEdit_6")
         self.lineEdit_6.setText("0")
+
+
+        self.lineEdit_7 = QtWidgets.QLineEdit(window)
+        self.lineEdit_7.setGeometry(QtCore.QRect(40, 270, 150, 20))
+        self.lineEdit_7.setObjectName("lineEdit_7")
+        self.lineEdit_7.setText("0")
 
     # Generate the view given coordinates and angles
     def generateView(self):
@@ -150,29 +164,28 @@ class Renderer(object):
         self.xCoord = self.lineEdit.text()
         self.yCoord = self.lineEdit_2.text()
         self.zCoord = self.lineEdit_3.text()
-        self.xAngle = self.lineEdit_4.text()
-        self.yAngle = self.lineEdit_5.text()
-        self.zAngle = self.lineEdit_6.text()
-
-        # print all coords and angles (For debugging purposes)
-        print("X Coord: ", self.xCoord)
-        print("Y Coord: ", self.yCoord)
-        print("Z Coord: ", self.zCoord)
-        print("X Angle: ", self.xAngle)
-        print("Y Angle: ", self.yAngle)
-        print("Z Angle: ", self.zAngle)
+        self.Angle = self.lineEdit_4.text()
+        self.xAxis = self.lineEdit_5.text()
+        self.yAxis = self.lineEdit_6.text()
+        self.zAxis = self.lineEdit_7.text()
 
         # Check if all coords and angles are numbers:
         try:
             float(self.xCoord)
             float(self.yCoord)
             float(self.zCoord)
-            float(self.xAngle)
-            float(self.yAngle)
-            float(self.zAngle)
+            float(self.Angle)
+            float(self.xAxis)
+            float(self.yAxis)
+            float(self.zAxis)
         except ValueError:
             print("One or more of the inputs is not a number.")
             return
+
+        # Using sys run python3 test.py
+        import subprocess
+        # subprocess.call(["python3", "test.py", self.xCoord, self.yCoord, self.zCoord, self.xAngle, self.yAngle, self.zAngle])
+        subprocess.call(["python3", "instant-NGP-cunerf/model/main.py", "--rhino", "--fp16", "--workspace \"cunerf-rhiner\"", "--render_new_view", "--translation", self.xCoord, self.yCoord, self.zCoord, "--rotation_angle", self.Angle, "--rotation_axis", self.xAxis, self.yAxis, self.zAxis])
 
         self.subwindow = QMainWindow()
         self.subwindow.setWindowTitle("Generated View")
@@ -180,7 +193,7 @@ class Renderer(object):
 
         # Create a QGraphicsScene and add the image to it
         scene = QGraphicsScene()
-        pixmap = QPixmap("pic.png")
+        pixmap = QPixmap("rendered_image.png")
         scene.addPixmap(pixmap)
 
         # Create a GraphicsViewWithZoom to display the QGraphicsScene
@@ -204,7 +217,8 @@ if __name__ == "__main__":
  
     MainWindow = QtWidgets.QMainWindow()
     ui = Renderer()
- 
+    
     ui.setupUi(MainWindow)
+    MainWindow.setWindowTitle("Renderer")
     MainWindow.show()
     sys.exit(app.exec_())
