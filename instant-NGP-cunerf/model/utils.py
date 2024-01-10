@@ -22,7 +22,8 @@ import lpips
 
 from scipy.spatial.transform import Rotation as R
 
-from pyquaternion import Quaternion
+import math
+from pytorch3d.transforms import Translate, axis_angle_to_quaternion, quaternion_apply
 
 from rich.console import Console
 from torch_ema import ExponentialMovingAverage
@@ -78,14 +79,30 @@ def get_slice_mgrid(x_dim, y_dim, z):
 
     return grid
 
-def get_view_mgrid(x_dim, y_dim, translation, rotation_angle, rotation_axis):
+def rotation_to_axis_angle(rotation_axis, rotation_angle):
 
+    # Convert the rotation axis and angle to a tensor
+    rotation_axis = torch.tensor(rotation_axis)
+    rotation_angle = torch.tensor(math.radians(rotation_angle))
+
+    # Normalize the rotation axis
+    rotation_axis = rotation_axis / torch.norm(rotation_axis)
+
+    # Multiply the rotation axis by the rotation angle to get the axis-angle representation
+    axis_angle = rotation_axis * rotation_angle
+
+    return axis_angle
+
+def get_view_mgrid(x_dim, y_dim, translation, rotation_angle, rotation_axis):
     # Generate the coordinates for the new view by multiplying the transformation matrix with the middle slice coordinates
     p0 = get_slice_mgrid(x_dim, y_dim, 0.0)
 
-    # Rotate the coordinates using the angle and rotation axis
-    rot_quat = Quaternion(axis=rotation_axis, angle=rotation_angle)
-    p0 = rot_quat.rotate(p0)
+    # Create a quaternion for the given rotation
+    axis_angle = rotation_to_axis_angle(rotation_axis, rotation_angle)
+    rot_quat = axis_angle_to_quaternion(axis_angle)
+
+    # Apply the rotation to the coordinates
+    p0 = quaternion_apply(rot_quat, p0)
 
     # Generate translation matrix for the given translation vector
     translation_matrix = torch.eye(4)

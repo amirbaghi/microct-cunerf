@@ -216,3 +216,77 @@
 [INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
 [INFO] loaded model.
 [INFO] Generating ground truth images ...
+[INFO] Trainer: ngp | 2024-01-10_14-29-17 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.
+[INFO] Trainer: ngp | 2024-01-10_14-29-52 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.
+[INFO] Trainer: ngp | 2024-01-10_15-11-29 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.
+[INFO] Trainer: ngp | 2024-01-10_15-12-05 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.
+[INFO] Trainer: ngp | 2024-01-10_15-13-42 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.
+[INFO] Trainer: ngp | 2024-01-10_15-22-39 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.
+[INFO] Trainer: ngp | 2024-01-10_15-24-50 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.
+[INFO] Trainer: ngp | 2024-01-10_15-27-06 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.
+[INFO] Trainer: ngp | 2024-01-10_15-29-24 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.
+[INFO] Trainer: ngp | 2024-01-10_15-30-47 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.
+[INFO] Trainer: ngp | 2024-01-10_15-31-25 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.
+[INFO] Trainer: ngp | 2024-01-10_15-36-24 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.
+[INFO] Trainer: ngp | 2024-01-10_15-39-14 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.
+[INFO] Trainer: ngp | 2024-01-10_16-03-48 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4225878
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] Trainer: ngp | 2024-01-10_16-05-52 | cuda:0 | fp16 | /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4
+[INFO] #parameters: 4143094
+[INFO] Loading latest checkpoint ...
+[INFO] Latest checkpoint is /cephyr/users/amirmaso/Alvis/microct-neural-repr/instant-NGP-cunerf/model/cunerf-rhino-resize4/checkpoints/ngp_ep0015.pth.tar
+[INFO] loaded model.

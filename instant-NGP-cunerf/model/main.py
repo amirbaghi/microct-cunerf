@@ -56,7 +56,6 @@ def train_model(trial, start_slice, end_slice, base_img_path, lr, fp16, workspac
     cube_xy_length = trial.suggest_categorical('cube_xy_length', [0.00001, 0.0001, 0.0005, 1. / H, 2. / H, 4. / H])
     cube_z_length = trial.suggest_categorical('cube_z_length', [1. / (end_slice - start_slice + 1), 2. / (end_slice - start_slice + 1), 4. / (end_slice - start_slice + 1)])
 
-
     # Set the length of the cube
     cube_lengths = torch.tensor([cube_xy_length, cube_xy_length, cube_z_length], device='cuda')
 
@@ -78,7 +77,7 @@ def train_model(trial, start_slice, end_slice, base_img_path, lr, fp16, workspac
     num_fine_samples = 192
 
     # Create dataset and dataloader for train and validation set
-    num_samples = 5000
+    num_samples = 2500
     train_dataset = MicroCTVolume(colors, coords, H, W)
     train_loader = DataLoader(train_dataset, batch_size=num_samples, shuffle=True, generator=torch.Generator(device='cpu'))
 
@@ -193,8 +192,8 @@ if __name__ == '__main__':
 
     # Tune the hyperparameters
     elif opt.tune:
-        study = optuna.create_study(direction='maximize', study_name='ngp_study_2', storage='sqlite:////cephyr/users/amirmaso/Alvis/microct-neural-repr/ngp_study.db', load_if_exists=True)
-        study.optimize(lambda trial: train_model(trial, start_slice, end_slice, base_img_path, opt.lr, opt.fp16, opt.workspace, resize_factor=8), n_trials=100)
+        study = optuna.create_study(direction='maximize', study_name='ngp_study_4', storage='sqlite:////cephyr/users/amirmaso/Alvis/microct-neural-repr/ngp_study.db', load_if_exists=True)
+        study.optimize(lambda trial: train_model(trial, start_slice, end_slice, base_img_path, opt.lr, opt.fp16, opt.workspace, resize_factor=8, maximum_parameters=10000000), n_trials=100)
         print(study.best_params)
         print(study.best_value)
         print(study.best_trial)
@@ -213,10 +212,13 @@ if __name__ == '__main__':
         trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, ema_decay=0.95, fp16=opt.fp16, use_checkpoint='latest',
                          eval_interval=1, length=cube_lengths, num_cube_samples=num_coarse_samples, num_fine_samples=num_fine_samples)
 
+        colors, coords, H, W = load_tiff_images(start_slice, end_slice, base_img_name, resize_factor=2)
+        H, W = int(H), int(W)
+
         # Renders a full 360 rotation of the volume around the given rotation axis
         if opt.render_full_rotation:
 
-            for x_rot in range(0, 360, 10):
+            for x_rot in range(0, 360, 50):
                 translation = opt.translation
                 rotation_angle = x_rot
                 rotation_axis = opt.rotation_axis

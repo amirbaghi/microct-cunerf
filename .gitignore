@@ -9,5 +9,6 @@ video-inr/
 *.png
 
 ngp_study.db
+ngp_study.db-journal
 
 *.out
