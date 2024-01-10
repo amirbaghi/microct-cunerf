@@ -116,7 +116,6 @@ def normalize(coordinates, x_dim, y_dim, z_dim):
     norm_coordinates = torch.stack([x_norm, y_norm, z_norm], dim=1)
     return norm_coordinates
 
-
 class MicroCTVolume(Dataset):
     def __init__(self, colors, coords, H, W):
         self.colors = colors
@@ -260,19 +259,64 @@ class Trainer(object):
         if self.log_ptr: 
             self.log_ptr.close()
 
-    def test(self, start, end, step, H, W, batch_size=100, base_image_path='pred'):
+    # Generate the model's predictions for slices from start to end, with n_between_slices slices in between
+    # The predictions are compared to the ground truth images using LPIPS, PSNR, and SSIM
+    def test(self, start, end, n_between_slices, H, W, ground_truth, batch_size=100, base_image_path='pred'):
         self.log("[INFO] Generating test images ...")
-        z_coords = torch.linspace(start, end, steps=step)
+        z_coords = torch.linspace(start, end, steps=end)
         z_coords = 2*(z_coords-(end/2)) / end
-        for z_slice in z_coords:    
+
+        step_size = 0
+        if n_between_slices > 0:
+            step_size = (z_coords[1] - z_coords[0]) / (n_between_slices + 1)
+
+        lpips_fn = lpips.LPIPS(net='alex')
+
+        for i, z_slice in enumerate(z_coords):
+
+            current_pixels = ground_truth[i].view(-1, 1).squeeze(1)
+            
+            # Generate the image for the current slice
             coords = get_slice_mgrid(H, W, float(z_slice))
-            self.test_image_partial(H, W, coords, self.device, batch_size=batch_size, imagepath=f'{base_image_path}_{z_slice:.2f}.png')
+            pred = self.test_image_partial(H, W, coords, self.device, batch_size=batch_size, imagepath=f'{base_image_path}_{z_slice:.2f}.png')
+
+            # Calculate the PSNR, SSIM, and LPIPS scores
+            mse = torch.nn.MSELoss()
+            mse = mse(pred, current_pixels).item()
+            psnr = 20 * np.log10(current_pixels.max() / np.sqrt(mse))
+
+            # Calculate SSIM
+            p_np = pred.numpy()
+            c_np = current_pixels.numpy()
+            ssim = structural_similarity(p_np, c_np, data_range=c_np.max() - c_np.min())
+
+            # Calculate LPIPS
+            lpips_score = lpips_fn(pred.reshape(1, 1, H, W), current_pixels.reshape(1, 1, H, W))
+            lpips_score = lpips_score.item()
+
+            print(f'Z coordinate {z_slice} reconstructed => MSE: {mse:.6f} and PSNR: {psnr:.6f}, SSIM: {ssim:.6f}, and LPIPS: {lpips_score:.6f}')
+
+            # Generate intermediate slices
+            if i < len(z_coords)-1:
+
+                for j in range(n_between_slices):
+                    z_slice = z_slice + step_size
+                    coords = get_slice_mgrid(H, W, float(z_slice))
+                    pred = self.test_image_partial(H, W, coords, self.device, batch_size=batch_size, imagepath=f'{base_image_path}_{z_slice:.2f}.png')
+
+                    # Calculate LPIPS with the previous slice's ground truth
+                    lpips_score = lpips_fn(pred.reshape(1, 1, H, W), current_pixels.reshape(1, 1, H, W))
+                    lpips_score = lpips_score.item()
+
+                    print(f'Z coordinate {z_slice} generalized => LPIPS: {lpips_score:.6f}')
+                    
 
     def create_ground_truths(self, H, W, start_slice_index, end_slice_index, colors, coords):
         self.log("[INFO] Generating ground truth images ...")   
 
         img = torch.empty(H * W, 1)
 
+        lpips_fn = lpips.LPIPS(net='alex')
         total_psnr = 0
         total_ssim = 0
         total_lpips = 0
@@ -302,15 +346,11 @@ class Trainer(object):
             ssim = structural_similarity(p_np, c_np, data_range=c_np.max() - c_np.min())
 
             # Calculate LPIPS
-            pred = pred.reshape(1, 1, H, W)
-            slice_colors = slice_colors.reshape(1, 1, H, W)
-
-            lpips_fn = lpips.LPIPS(net='alex')
-            lpips_score = lpips_fn(pred, slice_colors)
+            lpips_score = lpips_fn(pred.reshape(1, 1, H, W), slice_colors.reshape(1, 1, H, W))
             lpips_score = lpips_score.item()
 
             # Print PSNR and SSIM
-            print(f'Image {s}: MSE: {mse:.6f} and PSNR: {psnr:.6f}, SSIM: {ssim:.6f}, and LPIPS: {lpips_score:.6f}')
+            print(f'Image {s} => MSE: {mse:.6f} and PSNR: {psnr:.6f}, SSIM: {ssim:.6f}, and LPIPS: {lpips_score:.6f}')
             total_psnr += psnr
             total_ssim += ssim
             total_lpips += lpips_score
@@ -323,60 +363,6 @@ class Trainer(object):
         print("Average LPIPS: ", average_lpips)
 
         return average_psnr, average_ssim, average_lpips
-
-    def test_on_trained_slice(self, start_slice, end_slice, slice_index, base_img_path, imagepath='pred.png', resize_factor=1, save_img=True):
-        self.log("[INFO] Generating test image slice ...")
-        img_dataset = MicroCTVolume(base_img_name=f'{base_img_path}-', resize_factor=resize_factor, start_slice_index=slice_index, end_slice_index=slice_index)
-        height, width = img_dataset.get_H_W()
-        img_loader  = DataLoader(img_dataset, batch_size=height * width)
-
-        img_pred = torch.empty(height * width, 1)
-        img = torch.empty(height * width, 1)
-
-        z_coord = torch.linspace(-1, 1, steps=end_slice-start_slice+1)[list(range(start_slice, end_slice+1)).index(slice_index)]
-
-        i = 0
-        for pixel, coords in img_loader:
-
-            # Fix the z coordinates
-            coords[:,2] = z_coord
-
-            # Move input to GPU
-            torch.cuda.empty_cache()
-            coords = coords.to(self.device)
-
-            # Get model prediction
-            self.model.eval()
-            pred = self.model(coords)
-
-            # Store the partial prediction
-            img_pred[i:i+len(coords)] = pred.cpu().detach()
-
-            # Store the pixel values
-            img[i:i+len(coords)] = pixel
-
-            i = i + len(coords)
-
-        # Calculate the loss
-        mse = torch.nn.MSELoss()
-        mse = mse(img_pred, img).item()
-        psnr = 20 * np.log10(img.max() / np.sqrt(mse))
-
-        # If should save predicted image and ground truth
-        if save_img:
-            model_img = img_pred.view(height,width).numpy()
-            img = img.view(height,width).numpy()
-
-            # Save prediction image
-            plt.imsave(imagepath, model_img, cmap="gray")
-
-            # Save ground truth image
-            plt.imsave('gt.png', img, cmap="gray")
-
-
-        print(f'The resulting MSE: {mse:.6f} and PSNR: {psnr}')
-
-        return psnr
 
     def test_image_partial(self, height, width, coords, device, batch_size=100, imagepath='pred.png'):
 
@@ -565,14 +551,6 @@ class Trainer(object):
 
         # Adaptive Regularization Term 
         adapt_reg = torch.sqrt(loss_fine)
-
-        # # Get random indices of non-zero pixels
-        # non_zero_indices = torch.nonzero(pixels.view(-1)).squeeze()
-
-        # # Print a random sample of the pixels and the corresponding fine predictions
-        # random_indices = torch.randint(0, non_zero_indices.size(0), (10,))
-        # print(f'Pixels: {pixels[non_zero_indices[random_indices]]}')
-        # print(f'Fine predictions: {preds_fine[non_zero_indices[random_indices]]}')
 
         return adapt_reg * loss_coarse + loss_fine
 
@@ -905,13 +883,11 @@ class Trainer(object):
         checkpoint_dict = torch.load(checkpoint, map_location=self.device)
         
         if 'model' not in checkpoint_dict:
-            # self.model.load_state_dict(checkpoint_dict)
             self.coarse_model.load_state_dict(checkpoint_dict['coarse_model'])
             self.fine_model.load_state_dict(checkpoint_dict['fine_model'])
             self.log("[INFO] loaded model.")
             return
 
-        # missing_keys, unexpected_keys = self.model.load_state_dict(checkpoint_dict['model'], strict=False)
         missing_keys, unexpected_keys = self.coarse_model.load_state_dict(checkpoint_dict['coarse_model'], strict=False)
         missing_keys, unexpected_keys = self.fine_model.load_state_dict(checkpoint_dict['fine_model'], strict=False)
         self.log("[INFO] loaded model.")

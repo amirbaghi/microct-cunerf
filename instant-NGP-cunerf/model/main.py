@@ -200,8 +200,7 @@ if __name__ == '__main__':
         trainer = Trainer('ngp', coarse_model, fine_model, workspace=opt.workspace, ema_decay=0.95, fp16=opt.fp16, use_checkpoint='latest',
                          eval_interval=1, length=cube_lengths, num_cube_samples=num_coarse_samples, num_fine_samples=num_fine_samples)
         H, W = int(H), int(W)
-        trainer.test(0, (end_slice-start_slice+1), (end_slice-start_slice+1), H, W, batch_size=1000)
-        trainer.test(0, (end_slice-start_slice+1), 2 * (end_slice-start_slice+1), H, W, batch_size=1000)
+        trainer.test(0, (end_slice-start_slice+1), 1, H, W, colors, batch_size=5000)
 
     # Render new views of the volume given the translation, rotation angle and rotation axis
     elif opt.render_new_view:
@@ -267,4 +266,4 @@ if __name__ == '__main__':
 
         # Evaluate the training
         H,W = train_dataset.get_H_W()
-        trainer.test(0, (end_slice-start_slice+1), (end_slice-start_slice+1), H, W, batch_size=1000)
+        trainer.test(0, (end_slice-start_slice+1), 1, H, W, colors, batch_size=5000)
