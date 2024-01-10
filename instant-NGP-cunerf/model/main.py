@@ -77,7 +77,7 @@ def train_model(trial, start_slice, end_slice, base_img_path, lr, fp16, workspac
     num_fine_samples = 192
 
     # Create dataset and dataloader for train and validation set
-    num_samples = 2500
+    num_samples = 5000
     train_dataset = MicroCTVolume(colors, coords, H, W)
     train_loader = DataLoader(train_dataset, batch_size=num_samples, shuffle=True, generator=torch.Generator(device='cpu'))
 
@@ -94,7 +94,7 @@ def train_model(trial, start_slice, end_slice, base_img_path, lr, fp16, workspac
     ], lr=lr, betas=(0.9, 0.99), eps=1e-15)
 
     # Create scheduler to reduce the step size after N many epochs.
-    scheduler = lambda optimizer: optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+    scheduler = lambda optimizer: optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
 
     # Initialize the trainer.
     trainer = Trainer('ngp', coarse_model, fine_model, workspace=workspace, optimizer=optimizer, ema_decay=0.95, fp16=fp16, lr_scheduler=scheduler, use_checkpoint='scratch',
@@ -192,8 +192,8 @@ if __name__ == '__main__':
 
     # Tune the hyperparameters
     elif opt.tune:
-        study = optuna.create_study(direction='maximize', study_name='ngp_study_4', storage='sqlite:////cephyr/users/amirmaso/Alvis/microct-neural-repr/ngp_study.db', load_if_exists=True)
-        study.optimize(lambda trial: train_model(trial, start_slice, end_slice, base_img_path, opt.lr, opt.fp16, opt.workspace, resize_factor=8, maximum_parameters=10000000), n_trials=100)
+        study = optuna.create_study(direction='maximize', study_name='ngp_study_comp_rate_12', storage='sqlite:////cephyr/users/amirmaso/Alvis/microct-neural-repr/ngp_study.db', load_if_exists=True)
+        study.optimize(lambda trial: train_model(trial, start_slice, end_slice, base_img_path, opt.lr, opt.fp16, opt.workspace, resize_factor=8, maximum_parameters=4700000), n_trials=100)
         print(study.best_params)
         print(study.best_value)
         print(study.best_trial)
