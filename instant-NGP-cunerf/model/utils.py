@@ -314,8 +314,6 @@ class Trainer(object):
     def create_ground_truths(self, H, W, start_slice_index, end_slice_index, colors, coords):
         self.log("[INFO] Generating ground truth images ...")   
 
-        img = torch.empty(H * W, 1)
-
         lpips_fn = lpips.LPIPS(net='alex')
         total_psnr = 0
         total_ssim = 0
@@ -356,7 +354,7 @@ class Trainer(object):
             total_lpips += lpips_score
         
         average_psnr = total_psnr / (end_slice_index-start_slice_index+1)
-        print("Average PSNR: ", average_psnr.value)
+        print("Average PSNR: ", average_psnr.item())
         average_ssim = total_ssim / (end_slice_index-start_slice_index+1)
         print("Average SSIM: ", average_ssim)
         average_lpips = total_lpips / (end_slice_index-start_slice_index+1)

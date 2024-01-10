@@ -24,6 +24,10 @@ def train_model(trial, start_slice, end_slice, base_img_path, lr, fp16, workspac
     hidden_dim_c = trial.suggest_categorical('hidden_dim_c', [128, 256, 512])
     hidden_dim_f = trial.suggest_categorical('hidden_dim_f', [128, 256, 512])
 
+    # Modify the skips to have two skips in any chosen config
+    skips_c = trial.suggest_categorical('skips_c', [[3, 5], [4, 6], [5, 7], [3, 5, 7]])
+    skips_f = trial.suggest_categorical('skips_f', [[3, 5], [4, 6], [5, 7], [3, 5, 7]])
+
     num_levels_c = trial.suggest_categorical('num_levels_c', [2, 4, 8, 16, 32, 64])
     num_levels_f = trial.suggest_categorical('num_levels_f', [2, 4, 8, 16, 32, 64])
 
@@ -57,10 +61,10 @@ def train_model(trial, start_slice, end_slice, base_img_path, lr, fp16, workspac
     cube_lengths = torch.tensor([cube_xy_length, cube_xy_length, cube_z_length], device='cuda')
 
     # Initialize the models
-    coarse_model = INGPNetworkRHINO(num_layers=num_layers_c, hidden_dim=hidden_dim_c, skips=[4, 7], input_dim=3, num_levels=num_levels_c,
+    coarse_model = INGPNetworkRHINO(num_layers=num_layers_c, hidden_dim=hidden_dim_c, skips=skips_c, input_dim=3, num_levels=num_levels_c,
                     level_dim=level_dim_c, base_resolution=base_resolution_c, log2_hashmap_size=log2_hashmap_size_c, desired_resolution=H, 
                     align_corners=align_corners, freq=freq_c, transformer_num_layers=transformer_layers_c, transformer_hidden_dim=transformer_neurons_c)
-    fine_model = INGPNetworkRHINO(num_layers=num_layers_f, hidden_dim=hidden_dim_f, skips=[4, 7], input_dim=3, num_levels=num_levels_f,
+    fine_model = INGPNetworkRHINO(num_layers=num_layers_f, hidden_dim=hidden_dim_f, skips=skips_f, input_dim=3, num_levels=num_levels_f,
             level_dim=level_dim_f, base_resolution=base_resolution_f, log2_hashmap_size=log2_hashmap_size_f, desired_resolution=desired_resolution_f, 
             align_corners=align_corners, freq=freq_f, transformer_num_layers=transformer_layers_f, transformer_hidden_dim=transformer_neurons_f)
 
@@ -189,8 +193,8 @@ if __name__ == '__main__':
 
     # Tune the hyperparameters
     elif opt.tune:
-        study = optuna.create_study(direction='maximize', study_name='ngp_study', storage='sqlite:////cephyr/users/amirmaso/Alvis/microct-neural-repr/ngp_study.db', load_if_exists=True)
-        study.optimize(lambda trial: train_model(trial, start_slice, end_slice, base_img_path, opt.lr, opt.fp16, opt.workspace, resize_factor=4), n_trials=100)
+        study = optuna.create_study(direction='maximize', study_name='ngp_study_2', storage='sqlite:////cephyr/users/amirmaso/Alvis/microct-neural-repr/ngp_study.db', load_if_exists=True)
+        study.optimize(lambda trial: train_model(trial, start_slice, end_slice, base_img_path, opt.lr, opt.fp16, opt.workspace, resize_factor=8), n_trials=100)
         print(study.best_params)
         print(study.best_value)
         print(study.best_trial)
