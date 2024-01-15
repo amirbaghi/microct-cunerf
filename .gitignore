@@ -15,6 +15,8 @@ ngp_study.db-journal
 
 *.out
 
+job_script.sh
+
 instant-NGP-cunerf/model/__pycache__/
 instant-NGP-cunerf/model/cunerf-rhino-2-r4/
 instant-NGP-cunerf/model/cunerf-rhino-fine-best/
