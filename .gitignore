@@ -8,6 +8,8 @@ video-inr/
 
 *.png
 
+dataset/
+
 ngp_study.db
 ngp_study.db-journal
 
