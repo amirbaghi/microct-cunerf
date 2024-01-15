@@ -14,3 +14,11 @@ ngp_study.db
 ngp_study.db-journal
 
 *.out
+
+instant-NGP-cunerf/model/__pycache__/
+instant-NGP-cunerf/model/cunerf-rhino-2-r4/
+instant-NGP-cunerf/model/cunerf-rhino-fine-best/
+instant-NGP-cunerf/model/cunerf-rhino-resize4/
+instant-NGP-cunerf/model/optuna-studies-comprate-12/
+instant-NGP-cunerf/model/optuna-studies-comprate-4/
+instant-NGP-cunerf/model/optuna-studies-comprate-8/
